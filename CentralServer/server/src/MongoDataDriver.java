@@ -48,7 +48,7 @@ public class MongoDataDriver implements DataDriver {
     public boolean init()  {
         mongoClient = MongoClients.create(mongoURL);
         try {
-            database = mongoClient.getDatabase("weatherapi").withCodecRegistry(pojoCodecRegistry);
+            database = mongoClient.getDatabase("trackrai").withCodecRegistry(pojoCodecRegistry);
             measures = database.getCollection("measures", Measure.class);
             modules = database.getCollection("modules", Module.class);
             chipsets = database.getCollection("chipsets", Chipset.class);
