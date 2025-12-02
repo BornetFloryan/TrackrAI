@@ -4,152 +4,129 @@ const Chipset = require('./models/chipset.model')
 const bcrypt = require('bcryptjs');
 const SALT_WORK_FACTOR = 10;
 
-// chipsets
-let hrm = null;       // capteur de fréquence cardiaque
-let imu = null;       // accéléromètre + gyroscope (MPU-6050)
-let gps = null;       // optionnel : position / vitesse
+// two chipsets are initialized
+let lm35 = null;
+let bme280 = null;
 
 async function initChipsets() {
-
-    // Capteur de fréquence cardiaque
-    try {
-        hrm = await Chipset.findOne({name: 'hrm'}).exec()
-        if (hrm === null) {
-            hrm = new Chipset({
-                name: "hrm",
-                description: "Heart rate monitor (type MAX30100/MAX30102)",
-                links: ["https://exemple.com/"],
-                caps: ["heart_rate"],
-            })
-            hrm = await hrm.save()
-            console.log("added hrm chipset");
-        }
-    } catch (err) {
-        console.log("cannot add hrm chipset")
+  try {
+    lm35 = await Chipset.findOne({name: 'lm35'}).exec()
+    if (lm35 === null) {
+      lm35 = new Chipset({
+        name: "lm35",
+        description: "temperature sensor",
+        links: ["https://arduino-france.site/capteur-lm35/"],
+        caps: ["temperature"],
+      })
+      lm35 = await lm35.save()
+      console.log("added lm35 chipset");
     }
-
-    // MPU-6050
-    try {
-        imu = await Chipset.findOne({name: 'mpu6050'}).exec()
-        if (imu === null) {
-            imu = new Chipset({
-                name: "mpu6050",
-                description: "Accelerometer + Gyroscope (MPU-6050)",
-                links: ["https://exemple.com/"],
-                caps: ["acceleration", "rotation"],
-            })
-            imu = await imu.save()
-            console.log("added mpu6050 chipset");
-        }
-    } catch (err) {
-        console.log("cannot add mpu6050 chipset")
+  } catch (err) {
+    console.log("cannot add lm35 chipset")
+  }
+  try {
+    bme280 = await Chipset.findOne({name: 'bme280'}).exec()
+    if (bme280 === null) {
+      bme280 = new Chipset({
+        name: "bme280",
+        description: "temperature/humidity/pressure sensor",
+        links: ["https://passionelectronique.fr/tutorial-bme280/"],
+        caps: ["temperature", "humidity", "pressure"],
+      })
+      bme280 = await bme280.save()
+      console.log("added bme280 chipset");
     }
-
-    // GPS
-    try {
-        gps = await Chipset.findOne({name: 'gps'}).exec()
-        if (gps === null) {
-            gps = new Chipset({
-                name: "gps",
-                description: "GPS module (position + speed)",
-                links: ["https://exemple.com/"],
-                caps: ["position", "speed"],
-            })
-            gps = await gps.save()
-            console.log("added gps chipset");
-        }
-    } catch (err) {
-        console.log("cannot add gps chipset")
-    }
+  } catch (err) {
+    console.log("cannot add bme280 chipset")
+  }
 }
 
 async function initModules() {
-    let runner = null;
-    let cyclist = null;
-
-    // Module sportif 1 : Runner
-    try {
-        runner = await Module.findOne({name: 'runner module'}).exec()
-        if (runner === null) {
-            runner = new Module({
-                name: "runner module",
-                shortName: "run1",
-                key: "11111111-2222-3333-4444-555555555555",
-                uc: "esp32",
-                chipsets: [ hrm._id, imu._id ],
-            })
-            runner = await runner.save()
-            console.log("added runner module");
-        }
-    } catch (err) {
-        console.log("cannot add runner module")
+  let mod1 = null;
+  let mod2 = null;
+  try {
+    mod1 = await Module.findOne({name: 'module 1'}).exec()
+    if (mod1 === null) {
+      mod1 = new Module({
+        name: "module 1",
+        shortName: "mod1",
+        key: "58ae1d8f-027b-4061-a4c7-b37c3f8ed54e",
+        uc: "esp32",
+        chipsets: [ lm35._id, bme280._id],
+      })
+      mod1 = await mod1.save()
+      console.log("added module 1");
     }
-
-    // Module sportif 2 : Cyclist
-    try {
-        cyclist = await Module.findOne({name: 'cyclist module'}).exec()
-        if (cyclist === null) {
-            cyclist = new Module({
-                name: "cyclist module",
-                shortName: "cycle1",
-                key: "99999999-8888-7777-6666-555555555555",
-                uc: "esp32",
-                chipsets: [ gps._id, imu._id ],
-            })
-            cyclist = await cyclist.save()
-            console.log("added cyclist module");
-        }
-    } catch (err) {
-        console.log("cannot add cyclist module")
+  } catch (err) {
+    console.log("cannot add module 1")
+  }
+  try {
+    mod2 = await Module.findOne({name: 'module 2'}).exec()
+    if (mod2 === null) {
+      mod2 = new Module({
+        name: "module 2",
+        shortName: "mod2",
+        key: "2e46990d-3e85-45f8-82c8-f05eec1a1212",
+        uc: "esp8266",
+        chipsets: [ bme280._id],
+      })
+      mod2 = await mod2.save()
+      console.log("added module 2");
     }
+  } catch (err) {
+    console.log("cannot add module 2")
+  }
 }
 
 async function initUsers() {
-    let admin = null
-    try {
-        admin = await User.findOne({login: 'admin'}).exec()
-        if (admin === null) {
-            const salt = bcrypt.genSaltSync(SALT_WORK_FACTOR);
-            const password = bcrypt.hashSync('admin', salt);
-            admin = new User({
-                login: "admin",
-                password: password,
-                email: "admin@trackrai.fr",
-                rights: ['admin'],
-            })
-            admin = await admin.save()
-            console.log("added admin");
-        }
-    } catch (err) {
-        console.log("cannot add admin")
+  let admin = null
+  try {
+    admin = await User.findOne({login: 'admin'}).exec()
+    if (admin === null) {
+      const salt = bcrypt.genSaltSync(SALT_WORK_FACTOR);
+      const password = bcrypt.hashSync('admin', salt);
+      admin = new User({
+        login: "admin",
+        password: password,
+        email: "sdomas@univ-fcomte.fr",
+        rights: ['admin'],
+      })
+      admin = await admin.save()
+      console.log("added admin");
     }
+  } catch (err) {
+    console.log("cannot add admin")
+  }
+  let test = null
+  try {
+    test = await User.findOne({login: 'test'}).exec()
+    if (test === null) {
+      const salt = bcrypt.genSaltSync(SALT_WORK_FACTOR);
+      const password = bcrypt.hashSync('azer', salt);
+      test = new User({
+        login: "test",
+        password: password,
+        email: "sdomas@univ-fcomte.fr",
+        rights: ['basic'],
+      })
+      test = await test.save()
+      console.log("added test");
+    }
+  } catch (err) {
+    console.log("cannot add test")
+  }
 
-    let test = null
-    try {
-        test = await User.findOne({login: 'test'}).exec()
-        if (test === null) {
-            const salt = bcrypt.genSaltSync(SALT_WORK_FACTOR);
-            const password = bcrypt.hashSync('test', salt);
-            test = new User({
-                login: "test",
-                password: password,
-                email: "test@trackrai.fr",
-                rights: ['basic'],
-            })
-            test = await test.save()
-            console.log("added test");
-        }
-    } catch (err) {
-        console.log("cannot add test")
-    }
 }
 
 async function initBdD() {
-    await initChipsets()
-    await initModules()
-    await initUsers()
+  await initChipsets()
+  await initModules()
+  await initUsers()
 }
 
+
 module.exports = {
-    initBdD,
+  initBdD,
 };
+
+
