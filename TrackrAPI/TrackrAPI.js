@@ -2,7 +2,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require("cors");
-const weatherapiRouter = require('./routes/weatherapi.route'); // Imports routes
+const weatherapiRouter = require('./routes/trackrapi.route'); // Imports routes
 const Config = require("./commons/config");
 
 // extras imports
@@ -81,7 +81,7 @@ app.use(function(req, res, next) {
 //app.use(express.static(path.join(__dirname, '../../vuejs/gnose/dist')));
 
 
-app.use('/weatherapi', weatherapiRouter);
+app.use('/trackrapi', weatherapiRouter);
 
 app.use((req,res,next) => {
   res.status(404).send({error:1, status: 404, data: 'route d\'accès à l\'API invalide'})
