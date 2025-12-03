@@ -1,15 +1,13 @@
 import java.io.*;
-import java.net.*;
-import java.util.*;
 
-class WeatherClient {
+class TrackrClient {
 
   public static void main(String []args) {
 
     MainClient client;
 
     if (args.length != 2) {
-      System.out.println("usage: java WeatherClient ip_server port");
+      System.out.println("usage: java TrackrClient ip_server port");
       System.exit(1);
     }
 

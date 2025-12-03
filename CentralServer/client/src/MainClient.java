@@ -54,7 +54,7 @@ class MainClient  {
 		try {
 			// reading requests from keyboard
 			while (!stop) {
-				System.out.print("WeatherClient [type request]> ");
+				System.out.print("TrackrClient [type request]> ");
 				req = consoleIn.readLine();
 				if (req == null) {
 					stop = true;

@@ -2,7 +2,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require("cors");
-const weatherapiRouter = require('./routes/trackrapi.route'); // Imports routes
+const trackrapiRouter = require('./routes/trackrapi.route'); // Imports routes
 const Config = require("./commons/config");
 
 // extras imports
@@ -22,8 +22,8 @@ to the API. Two solutions :
 The first option is obviously the only possible for production version.
 
 const https = require('https');
-const privateKey  = fs.readFileSync('ssl/weatherapi.key', 'utf8');
-const certificate = fs.readFileSync('ssl/weatherapi.crt', 'utf8');
+const privateKey  = fs.readFileSync('ssl/trackrapi.key', 'utf8');
+const certificate = fs.readFileSync('ssl/trackrapi.crt', 'utf8');
 const credentials = {key: privateKey, cert: certificate};
 */
 
@@ -47,7 +47,7 @@ const corsOptions = {
 
 // setup mongo connection
 const mongoose = require('mongoose');
-let dev_db_url = 'mongodb://localhost/weatherapi';
+let dev_db_url = 'mongodb://localhost/trackrapi';
 let mongoDB = process.env.MONGODB_URI || dev_db_url;
 //mongoose.set('debug',true);
 mongoose.connect(mongoDB);
@@ -81,7 +81,7 @@ app.use(function(req, res, next) {
 //app.use(express.static(path.join(__dirname, '../../vuejs/gnose/dist')));
 
 
-app.use('/trackrapi', weatherapiRouter);
+app.use('/trackrapi', trackrapiRouter);
 
 app.use((req,res,next) => {
   res.status(404).send({error:1, status: 404, data: 'route d\'accès à l\'API invalide'})
@@ -112,6 +112,6 @@ httpsServer.listen(process.env.PORT, () =>
 
 const httpServer = http.createServer(app);
 httpServer.listen(process.env.PORT, () =>
-  console.log(`weatherapi started on port ${process.env.PORT}!`)
+  console.log(`trackrapi started on port ${process.env.PORT}!`)
 );
 

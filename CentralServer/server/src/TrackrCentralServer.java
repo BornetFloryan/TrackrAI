@@ -1,15 +1,13 @@
 import java.io.*;
-import java.net.*;
-import java.util.*;
 
-class WeatherCentralServer {
+class TrackrCentralServer {
 
   public static void main(String []args) {
 
     MainServer server = null;
 
     if (args.length != 1) {
-      System.out.println("usage: WeatherCentralServer port");
+      System.out.println("usage: TrackrCentralServer port");
       System.exit(1);
     }
 

@@ -1,6 +1,6 @@
 module.exports = {
   defaultLang: 'fr',
-  secretKey: 'do-not-reveal-weatherapi-secret-key',
+  secretKey: 'do-not-reveal-trackrapi-secret-key',
   jwtExpiration: 300, // change to 300 (=5 minutes) for prod
   jwtRefreshExpiration: 7200, // change to 7200 (=2h) for prod
   loginRefreshExpiration: 5, // 5 sec. should be sufficient
