@@ -1,13 +1,12 @@
-import axios from "axios";
-const API = "http://localhost:4567/trackrapi";
+import api from './api.service'
 
 export default {
-    async getMeasures(moduleKey = null) {
-        const url = moduleKey
-            ? `${API}/measure/get?key=${moduleKey}`
-            : `${API}/measure/get`;
+  async getMeasures(moduleKey = null) {
+    const route = moduleKey
+      ? `/measure/get?key=${moduleKey}`
+      : `/measure/get`
 
-        const res = await axios.get(url);
-        return res.data.data;
-    },
-};
+    const res = await api.get(route)
+    return res.data.data || []
+  },
+}

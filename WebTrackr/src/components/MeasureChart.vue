@@ -1,6 +1,6 @@
 <template>
   <div>
-    <Line :data="chartData" />
+    <Line :data="chartData" :options="chartOptions" />
   </div>
 </template>
 
@@ -12,23 +12,31 @@ import {
   LineElement,
   PointElement,
   LinearScale,
-  CategoryScale
+  CategoryScale,
+  Tooltip,
+  Legend
 } from 'chart.js'
 
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale)
+ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend)
 
 const props = defineProps({
-  measures: Array
+  measures: { type: Array, required: true }
 })
 
 const chartData = computed(() => ({
   labels: props.measures.map(m => new Date(m.date).toLocaleTimeString()),
   datasets: [
     {
-      label: "FC (bpm)",
-      data: props.measures.map(m => m.value),
-      borderColor: "blue"
+      label: 'BPM',
+      data: props.measures.map(m => Number(m.value)),
+      borderColor: '#3b82f6',
+      backgroundColor: 'transparent'
     }
   ]
 }))
+
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false
+}
 </script>
