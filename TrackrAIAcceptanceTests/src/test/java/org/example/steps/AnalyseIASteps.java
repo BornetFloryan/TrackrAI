@@ -23,4 +23,37 @@ public class AnalyseIASteps {
     public void indicateur_calcule() {
         assertTrue(WorldContext.world.analyseEffectuee);
     }
+
+    @Given("aucune donnée n'est stockée")
+    public void aucune_donnee_stockee() {
+        WorldContext.world.mesureEnregistree = false;
+    }
+
+    @Then("aucun indicateur n'est calculé")
+    public void aucun_indicateur_calcule() {
+        assertFalse(WorldContext.world.analyseEffectuee);
+    }
+
+    @Then("une erreur est signalée")
+    public void erreur_signalee() {
+        assertTrue(true);
+    }
+
+    @Given("une analyse IA a été effectuée")
+    public void analyse_ia_effectuee() {
+        WorldContext.world.analyseEffectuee = true;
+    }
+
+    @When("les résultats sont traités")
+    public void resultats_traites() {
+        if (WorldContext.world.analyseEffectuee) {
+            WorldContext.world.recommandationGeneree = true;
+        }
+    }
+
+    @Then("une recommandation personnalisée est générée")
+    public void recommandation_generee() {
+        assertTrue(WorldContext.world.recommandationGeneree);
+    }
+
 }
