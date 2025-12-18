@@ -15,7 +15,7 @@ public class CentralServerWorld {
     public boolean analyseStockee;
 
     // Erreurs
-    public boolean   erreurProtocole;
+    public boolean erreurProtocole;
     public String dernierMessageErreur;
 
     // Multi-clients
