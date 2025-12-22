@@ -8,12 +8,22 @@ class MainServer  {
     int port;
     DataExchanger exchanger;
     int idThread;
+	String apiUrl;
+	String mongoUr;
 
     public MainServer(int port) throws IOException {
         this.port = port;
         conn = new ServerSocket(port,1);
         idThread = 1;
-        exchanger = new DataExchanger("http://localhost:4567/trackrapi", "mongodb://localhost:27017");
+		apiUrl = System.getenv().getOrDefault(
+    		"TRACKR_API_URL",
+    		"http://localhost:4567/trackrapi"
+		);
+		mongoUrl = System.getenv().getOrDefault(
+			"MONGO_URL",
+			"mongodb://localhost:27017"
+		);
+		exchanger = new DataExchanger(apiUrl, mongoUrl);
         // need to initializae mongo driver
         if (!exchanger.getMongoDriver().init()) {
             throw new IOException("cannot reach mongodb server and/or trackrapi database");
