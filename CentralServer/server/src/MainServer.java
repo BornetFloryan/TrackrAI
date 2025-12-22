@@ -9,7 +9,7 @@ class MainServer  {
     DataExchanger exchanger;
     int idThread;
 	String apiUrl;
-	String mongoUr;
+	String mongoUrl;
 
     public MainServer(int port) throws IOException {
         this.port = port;
