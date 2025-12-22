@@ -48,7 +48,7 @@ const corsOptions = {
 // setup mongo connection
 const mongoose = require('mongoose');
 let dev_db_url = 'mongodb://localhost:27017/trackrai';
-let mongoDB = process.env.MONGODB_URI || dev_db_url;
+let mongoDB = process.env.MONGODB_URL || dev_db_url;
 //mongoose.set('debug',true);
 mongoose.connect(mongoDB);
 mongoose.Promise = global.Promise;
