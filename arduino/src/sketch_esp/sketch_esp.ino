@@ -19,6 +19,8 @@
 
 #include <time.h>
 
+#include <Preferences.h>
+
 /* ================= PINS ================= */
 #define GPS_RX_PIN 27
 #define SDA_PIN    19
@@ -34,6 +36,8 @@ TinyGPSPlus gps;
 HardwareSerial gpsSerial(2);
 MPU6050 mpu;
 
+Preferences prefs;
+
 /* BLE */
 BLEClient* bleClient = nullptr;
 BLERemoteCharacteristic* hrChar = nullptr;
@@ -41,6 +45,8 @@ BLERemoteCharacteristic* hrChar = nullptr;
 /* Module */
 String moduleKey = "";
 bool registered = false;
+
+bool recording = false;
 
 /* Cardio */
 uint16_t heartRate = 0;
@@ -160,7 +166,9 @@ void autoRegister() {
       moduleKey = resp.substring(idx + 1);
       moduleKey.trim();
       registered = true;
-      Serial.println("Module key = " + moduleKey);
+
+      prefs.putString("moduleKey", moduleKey);
+      Serial.println("Module key sauvegardée = " + moduleKey);
     }
   }
 }
@@ -179,6 +187,23 @@ void sendMeasure(const char* type, float value) {
   tcp.print(value);
   tcp.print(" ");
   tcp.println(moduleKey);
+}
+
+void handleServerCommands() {
+  while (tcp.available()) {
+    String cmd = tcp.readStringUntil('\n');
+    cmd.trim();
+
+    if (cmd == "START_RECORD") {
+      recording = true;
+      Serial.println("Enregistrement démarré");
+    }
+
+    if (cmd == "STOP_RECORD") {
+      recording = false;
+      Serial.println("Enregistrement arrêté");
+    }
+  }
 }
 
 /* ================= WIFI MANAGER ================= */
@@ -206,6 +231,17 @@ void setupWiFi() {
 void setup() {
   Serial.begin(115200);
 
+  prefs.begin("trackr", false);
+
+  moduleKey = prefs.getString("moduleKey", "");
+  if (moduleKey.length() > 0) {
+    registered = true;
+    Serial.println("Module déjà enregistré");
+    Serial.println("Module key = " + moduleKey);
+  } else {
+    Serial.println("Aucune moduleKey trouvée, auto-enregistrement requis");
+  }
+
   setupWiFi();
   configTime(0, 0, "pool.ntp.org");
 
@@ -216,7 +252,7 @@ void setup() {
     Serial.print(".");
     now = time(nullptr);
   }
-Serial.println("\nHeure NTP synchronisée");
+  Serial.println("\nHeure NTP synchronisée");
 
 
   gpsSerial.begin(9600, SERIAL_8N1, GPS_RX_PIN, -1);
@@ -228,6 +264,8 @@ Serial.println("\nHeure NTP synchronisée");
 
 /* ================= LOOP ================= */
 void loop() {
+  
+  handleServerCommands();
 
   while (gpsSerial.available())
     gps.encode(gpsSerial.read());
@@ -241,7 +279,10 @@ void loop() {
       return;
     }
     Serial.println("TCP connecté");
-    registered = false;
+
+    if (moduleKey.length() > 0) {
+      registered = true;
+    }
   }
 
   if (!registered) {
@@ -253,6 +294,8 @@ void loop() {
   /* ===== TIMING ===== */
   if (millis() - lastSend < SEND_INTERVAL) return;
   lastSend = millis();
+
+  if (!recording) return;
 
   /* ===== GPS ===== */
   if (gps.location.isValid()) {
