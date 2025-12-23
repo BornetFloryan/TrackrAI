@@ -29,7 +29,7 @@ services:
       - TRACKR_API_URL=http://trackr-api:4567/trackrapi
       - MONGO_URL=mongodb://mongo:27017
     ports:
-      - "9000:9000"
+      - "29000:9000"
 
   analyze:
     build: ./AnalyzeServer
