@@ -168,15 +168,17 @@ void autoRegister() {
 void sendMeasure(const char* type, float value) {
   if (!registered) return;
 
-  long ts = time(nullptr);
+  time_t ts = time(nullptr);
+  if (ts < 1600000000) return;
+
   tcp.print("STOREMEASURE ");
-  tcp.print(moduleKey);
-  tcp.print(" ");
   tcp.print(type);
   tcp.print(" ");
-  tcp.print(ts);
+  tcp.print((long long)ts * 1000);
   tcp.print(" ");
-  tcp.println(value);
+  tcp.print(value);
+  tcp.print(" ");
+  tcp.println(moduleKey);
 }
 
 /* ================= WIFI MANAGER ================= */
@@ -206,6 +208,16 @@ void setup() {
 
   setupWiFi();
   configTime(0, 0, "pool.ntp.org");
+
+  Serial.print("Synchronisation NTP");
+  time_t now = time(nullptr);
+  while (now < 1600000000) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+  }
+Serial.println("\nHeure NTP synchronisée");
+
 
   gpsSerial.begin(9600, SERIAL_8N1, GPS_RX_PIN, -1);
   Wire.begin(SDA_PIN, SCL_PIN);
