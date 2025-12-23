@@ -1,8 +1,9 @@
 import socket
 import json
+import os
 
-CENTRAL_HOST = "192.168.1.xx"
-CENTRAL_PORT = 5000
+CENTRAL_HOST = os.getenv("CENTRAL_HOST", "localhost")
+CENTRAL_PORT = int(os.getenv("CENTRAL_PORT", "9000"))
 
 def send_results_to_central(results):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
