@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  mongo:
+    image: mongo:4.4
+    container_name: trackr-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+
+  api:
+    build: ./TrackrAPI
+    container_name: trackr-api
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      - MONGODB_URL=mongodb://mongo:27017/trackrai
+      - PORT=4567
+    ports:
+      - "4567:4567"
+
+  central:
+    build: ./CentralServer
+    container_name: trackr-central
+    restart: unless-stopped
+    depends_on:
+      - api
+      - mongo
+    environment:
+      - TRACKR_API_URL=http://trackr-api:4567/trackrapi
+      - MONGO_URL=mongodb://mongo:27017
+    ports:
+      - "9000:9000"
+
+  analyze:
+    build: ./AnalyzeServer
+    container_name: trackr-analyze
+    restart: unless-stopped
+    depends_on:
+      - central
+    environment:
+      - CENTRAL_HOST=trackr-central
+      - CENTRAL_PORT=9000
+
+volumes:
+  mongo-data:
