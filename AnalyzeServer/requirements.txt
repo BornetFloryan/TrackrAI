@@ -1,2 +1,8 @@
-opencv-python-headless
-mediapipe
+opencv-python
+mediapipe==0.10.9
+numpy
+protobuf==3.20.3
+matplotlib
+Pillow
+scipy
+sounddevice
