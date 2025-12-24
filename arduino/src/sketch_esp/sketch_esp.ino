@@ -194,14 +194,13 @@ void handleServerCommands() {
     String cmd = tcp.readStringUntil('\n');
     cmd.trim();
 
-    if (cmd == "START_RECORD") {
+    if (cmd.startsWith("START_SESSION")) {
       recording = true;
-      Serial.println("Enregistrement démarré");
+      Serial.println("Enregistrement démarré (session)");
     }
-
-    if (cmd == "STOP_RECORD") {
+    else if (cmd == "STOP_SESSION") {
       recording = false;
-      Serial.println("Enregistrement arrêté");
+      Serial.println("Enregistrement arrêté (session)");
     }
   }
 }

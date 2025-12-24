@@ -177,6 +177,7 @@ class ThreadServer extends Thread {
 		);
 
 		ps.println("OK");
+		ps.println("START_SESSION");
 	}
 
 	protected void requestStopSession() throws IOException {
@@ -190,5 +191,6 @@ class ThreadServer extends Thread {
 		);
 
 		ps.println("OK");
+		ps.println("STOP_SESSION");
 	}
 }
