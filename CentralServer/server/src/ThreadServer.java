@@ -13,6 +13,9 @@ class ThreadServer extends Thread {
 	DataExchanger exchanger;
 	int idThread;
 
+	boolean sessionActive = false;
+	String currentSessionId = null;
+
 	public ThreadServer(int idThread, Socket sock, DataExchanger data) {
 		this.sock = sock;
 		this.idThread = idThread;
@@ -58,11 +61,21 @@ class ThreadServer extends Thread {
 				else if ("STOREANALYSIS".equals(idReq)) {
 					requestStoreAnalysis(reqParts);
 				}
+				else if ("START_SESSION".equals(idReq)) {
+					requestStartSession(reqParts);
+				}
+				else if ("STOP_SESSION".equals(idReq)) {
+					requestStopSession();
+				}
 			}
 			System.out.println("end of request loop");
 		}
 		catch(IOException e) {
 			System.out.println("problem with receiving request: "+e.getMessage());
+		}
+		finally {
+			sessionActive = false;
+			currentSessionId = null;
 		}
 	}
 
@@ -85,15 +98,25 @@ class ThreadServer extends Thread {
 	}
 
 	protected void requestStoreMeasure(String[] params) throws IOException {
-		System.out.println("processing request STORE MEASURE");
+		if (!sessionActive || currentSessionId == null) {
+			ps.println("ERR no active session");
+			return;
+		}
 
 		if (params.length != 5) {
 			ps.println("ERR invalid number of parameters");
 			return;
 		}
+
+		System.out.println(
+				"processing STOREMEASURE in session " + currentSessionId
+		);
+
 		// (un)comment to choose direct mongo access or through the node API
 		//String answer = exchanger.getMongoDriver().saveMeasure(params[1], params[2], params[3], params[4]);
-		String answer = exchanger.getHttpDriver().saveMeasure(params[1], params[2], params[3], params[4]);
+		String answer = exchanger.getHttpDriver()
+				.saveMeasure(params[1], params[2], params[3], params[4]);
+
 		System.out.println(answer);
 		ps.println(answer);
 	}
@@ -112,6 +135,34 @@ class ThreadServer extends Thread {
 		ps.println(answer);
 	}
 
+	protected void requestStartSession(String[] params) throws IOException {
+
+		if (params.length != 2) {
+			ps.println("ERR invalid parameters");
+			return;
+		}
+
+		currentSessionId = params[1];
+		sessionActive = true;
+
+		System.out.println(
+				"Thread " + idThread + " -> session started: " + currentSessionId
+		);
+
+		ps.println("OK");
+	}
+
+	protected void requestStopSession() throws IOException {
+
+		sessionActive = false;
+		currentSessionId = null;
+
+		System.out.println(
+				"Thread " + idThread + " -> session stopped"
+		);
+
+		ps.println("OK");
+	}
 }
 
 		
