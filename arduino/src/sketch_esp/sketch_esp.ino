@@ -174,7 +174,7 @@ void autoRegister() {
 }
 
 void sendMeasure(const char* type, float value) {
-  if (!registered) return;
+  if (!registered || !recording) return;
 
   time_t ts = time(nullptr);
   if (ts < 1600000000) return;

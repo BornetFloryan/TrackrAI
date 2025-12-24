@@ -76,9 +76,17 @@ public class HttpDataDriver implements DataDriver {
         return "OK "+name+","+shortName+","+key;
     }
 
-    public synchronized  String saveMeasure(String type, String date, String value, String moduleKey) {
+    public synchronized  String saveMeasure(String type, String date, String value, String moduleKey, String sessionId) {
 
-        String payload = "{\"type\": \""+type+"\", \"date\": \""+date+"\", \"value\": \""+value+"\", \"moduleKey\": \""+moduleKey+"\"}";
+        String payload =
+                "{"
+                        + "\"type\":\""+type+"\","
+                        + "\"date\":\""+date+"\","
+                        + "\"value\":\""+value+"\","
+                        + "\"moduleKey\":\""+moduleKey+"\","
+                        + "\"sessionId\":\""+sessionId+"\""
+                        + "}";
+
         return sendMeasure(payload);
     }
 

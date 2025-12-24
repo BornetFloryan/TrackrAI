@@ -87,6 +87,11 @@ const create = async function (req, res, next) {
     date: req.body.date,
     value : req.body.value,
   };
+
+  if (req.body.sessionId) {
+      m.sessionId = req.body.sessionId;
+  }
+
   // if module key is given, check if module id exists
   if (req.body.moduleKey) {
     let module = null

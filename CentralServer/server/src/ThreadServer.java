@@ -117,7 +117,7 @@ class ThreadServer extends Thread {
 		// (un)comment to choose direct mongo access or through the node API
 		//String answer = exchanger.getMongoDriver().saveMeasure(params[1], params[2], params[3], params[4]);
 		String answer = exchanger.getHttpDriver()
-				.saveMeasure(params[1], params[2], params[3], params[4]);
+				.saveMeasure(params[1], params[2], params[3], params[4], currentSessionId);
 
 		System.out.println(answer);
 		ps.println(answer);
