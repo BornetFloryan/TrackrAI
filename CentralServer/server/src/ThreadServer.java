@@ -15,6 +15,8 @@ class ThreadServer extends Thread {
 	boolean sessionActive = false;
 	String currentSessionId = null;
 
+	String moduleKey = null;
+
 	public ThreadServer(int idThread, Socket sock, DataExchanger data) {
 		this.sock = sock;
 		this.idThread = idThread;
@@ -66,6 +68,15 @@ class ThreadServer extends Thread {
 				}
 				else if ("STOP_SESSION".equals(idReq)) {
 					requestStopSession();
+				}
+				else if ("HELLO".equals(idReq)) {
+					requestHello(reqParts);
+				}
+				else if ("START_SESSION_FOR_MODULE".equals(idReq)) {
+					requestStartSessionForModule(reqParts);
+				}
+				else if ("STOP_SESSION_FOR_MODULE".equals(idReq)) {
+					requestStopSessionForModule(reqParts);
 				}
 				else {
 					ps.println("ERR unknown command");
@@ -177,7 +188,6 @@ class ThreadServer extends Thread {
 		);
 
 		ps.println("OK");
-		ps.println("START_SESSION");
 	}
 
 	protected void requestStopSession() throws IOException {
@@ -191,6 +201,78 @@ class ThreadServer extends Thread {
 		);
 
 		ps.println("OK");
-		ps.println("STOP_SESSION");
+	}
+
+	protected void requestHello(String[] params) throws IOException {
+
+		if (params.length != 2) {
+			ps.println("ERR invalid parameters");
+			return;
+		}
+
+		moduleKey = params[1];
+
+		MainServer.modules.put(moduleKey, this);
+
+		System.out.println(
+				"Thread " + idThread + " -> HELLO from module " + moduleKey
+		);
+
+		ps.println("OK");
+	}
+
+	protected void requestStartSessionForModule(String[] params) throws IOException {
+
+		if (params.length != 3) {
+			ps.println("ERR invalid parameters");
+			return;
+		}
+
+		String targetModuleKey = params[1];
+		String sessionId = params[2];
+
+		ThreadServer target = MainServer.modules.get(targetModuleKey);
+		if (target == null) {
+			ps.println("ERR module not connected");
+			return;
+		}
+
+		boolean ok = exchanger.getHttpDriver().isSessionActive(sessionId);
+		if (!ok) {
+			ps.println("ERR invalid or inactive session");
+			return;
+		}
+
+		target.currentSessionId = sessionId;
+		target.sessionActive = true;
+
+		target.ps.println("START_SESSION " + sessionId);
+		target.ps.flush();
+
+		ps.println("OK");
+	}
+
+	protected void requestStopSessionForModule(String[] params) throws IOException {
+
+		if (params.length != 2) {
+			ps.println("ERR invalid parameters");
+			return;
+		}
+
+		String targetModuleKey = params[1];
+
+		ThreadServer target = MainServer.modules.get(targetModuleKey);
+		if (target == null) {
+			ps.println("ERR module not connected");
+			return;
+		}
+
+		target.sessionActive = false;
+		target.currentSessionId = null;
+
+		target.ps.println("STOP_SESSION");
+		target.ps.flush();
+
+		ps.println("OK");
 	}
 }

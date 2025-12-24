@@ -1,7 +1,11 @@
 import java.io.*;
 import java.net.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 class MainServer  {
+
+    public static ConcurrentHashMap<String, ThreadServer> modules =
+            new ConcurrentHashMap<>();
 
     ServerSocket conn;
     Socket sock;

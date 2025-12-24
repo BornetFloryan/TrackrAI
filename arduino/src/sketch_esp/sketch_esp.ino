@@ -279,6 +279,11 @@ void loop() {
     }
     Serial.println("TCP connecté");
 
+    // identification du module auprès du serveur
+    tcp.print("HELLO ");
+    tcp.println(moduleKey);
+    tcp.flush();
+
     if (moduleKey.length() > 0) {
       registered = true;
     }
