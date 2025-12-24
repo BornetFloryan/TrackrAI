@@ -11,12 +11,14 @@ const moduleController = require('../controllers/module.controller');
 const measureController = require('../controllers/measure.controller');
 const userController = require('../controllers/user.controller');
 const authController = require('../controllers/auth.controller');
+const sessionController = require('../controllers/session.controller');
+
 
 const asyncRoute = ctrl =>
-  (req, res, next) => {
-    Promise.resolve(ctrl(req, res, next))
-      .catch(next);
-  };
+    (req, res, next) => {
+        Promise.resolve(ctrl(req, res, next))
+            .catch(next);
+    };
 
 router.post('/measure/create', asyncRoute(measureController.create));
 router.patch('/measure/update', asyncRoute(measureController.update));
@@ -32,5 +34,23 @@ router.patch('/user/update', asyncRoute(userController.update));
 router.get('/user/getusers', asyncRoute(userController.getUsers));
 
 router.post('/auth/signin', asyncRoute(authController.signIn));
+
+router.post(
+    '/session/start',
+    asyncRoute(authController.verifyToken),
+    asyncRoute(sessionController.start)
+);
+
+router.post(
+    '/session/stop',
+    asyncRoute(authController.verifyToken),
+    asyncRoute(sessionController.stop)
+);
+
+router.post(
+    '/session/active',
+    asyncRoute(sessionController.active)
+);
+
 
 module.exports = router;

@@ -11,7 +11,7 @@ let MeasureSchema = new Schema({
     // if the measure comes from a module, store it
     module: {type: Schema.Types.ObjectId, ref: 'Module'},
     // session id
-    sessionId: { type: String }
+    session: { type: Schema.Types.ObjectId, ref: 'Session' },
 },{versionKey: false});
 
 module.exports = MeasureSchema;
