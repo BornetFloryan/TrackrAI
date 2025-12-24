@@ -66,6 +66,8 @@ class ThreadServer extends Thread {
 				}
 				else if ("STOP_SESSION".equals(idReq)) {
 					requestStopSession();
+				} else {
+					ps.println("ERR unknown command");
 				}
 			}
 			System.out.println("end of request loop");
