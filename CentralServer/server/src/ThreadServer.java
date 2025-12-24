@@ -1,5 +1,3 @@
-import org.bson.types.ObjectId;
-
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
@@ -13,6 +11,7 @@ class ThreadServer extends Thread {
 	DataExchanger exchanger;
 	int idThread;
 
+	// === SESSION STATE ===
 	boolean sessionActive = false;
 	String currentSessionId = null;
 
@@ -32,6 +31,7 @@ class ThreadServer extends Thread {
 			System.err.println("Thread "+ idThread +": cannot create streams. Aborting.");
 			return;
 		}
+
 		requestLoop();
 		System.out.println("end of thread "+ idThread);
 	}
@@ -66,7 +66,8 @@ class ThreadServer extends Thread {
 				}
 				else if ("STOP_SESSION".equals(idReq)) {
 					requestStopSession();
-				} else {
+				}
+				else {
 					ps.println("ERR unknown command");
 				}
 			}
@@ -82,24 +83,30 @@ class ThreadServer extends Thread {
 	}
 
 	protected void requestAutoRegister(String[] params) throws IOException {
+
 		// remove the identifier+uc from params
 		List<String> lst = new ArrayList<>();
 		for(int i=2;i<params.length;i++) {
 			lst.add(params[i]);
 		}
+
 		System.out.println("processing request AUTO REGISTER");
+
 		if (params.length < 3) {
 			ps.println("ERR invalid number of parameters");
 			return;
 		}
+
 		// (un)comment to choose direct mongo access or through the node API
-		//String answer = exchanger.getMongoDriver().autoRegisterModule(params[1], lst);
+		// String answer = exchanger.getMongoDriver().autoRegisterModule(params[1], lst);
 		String answer = exchanger.getHttpDriver().autoRegisterModule(params[1], lst);
+
 		System.out.println(answer);
 		ps.println(answer);
 	}
 
 	protected void requestStoreMeasure(String[] params) throws IOException {
+
 		if (!sessionActive || currentSessionId == null) {
 			ps.println("ERR no active session");
 			return;
@@ -115,7 +122,7 @@ class ThreadServer extends Thread {
 		);
 
 		// (un)comment to choose direct mongo access or through the node API
-		//String answer = exchanger.getMongoDriver().saveMeasure(params[1], params[2], params[3], params[4]);
+		// String answer = exchanger.getMongoDriver().saveMeasure(params[1], params[2], params[3], params[4]);
 		String answer = exchanger.getHttpDriver()
 				.saveMeasure(params[1], params[2], params[3], params[4], currentSessionId);
 
@@ -124,15 +131,18 @@ class ThreadServer extends Thread {
 	}
 
 	protected void requestStoreAnalysis(String[] params) throws IOException {
+
 		System.out.println("processing request STORE ANALYSIS");
 
 		if (params.length != 4) {
 			ps.println("ERR invalid number of parameters");
 			return;
 		}
+
 		// (un)comment to choose direct mongo access or through the node API
 		String answer = exchanger.getMongoDriver().saveAnalysis(params[1], params[2], params[3]);
-		//String answer = exchanger.getHttpDriver().saveAnalysis(params[1], params[2], params[3]);
+		// String answer = exchanger.getHttpDriver().saveAnalysis(params[1], params[2], params[3]);
+
 		System.out.println(answer);
 		ps.println(answer);
 	}
@@ -144,7 +154,22 @@ class ThreadServer extends Thread {
 			return;
 		}
 
-		currentSessionId = params[1];
+		// refuse if already active
+		if (sessionActive) {
+			ps.println("ERR session already active");
+			return;
+		}
+
+		String sessionId = params[1];
+
+		// validate session with API
+		boolean ok = exchanger.getHttpDriver().isSessionActive(sessionId);
+		if (!ok) {
+			ps.println("ERR invalid or inactive session");
+			return;
+		}
+
+		currentSessionId = sessionId;
 		sessionActive = true;
 
 		System.out.println(
@@ -156,6 +181,7 @@ class ThreadServer extends Thread {
 
 	protected void requestStopSession() throws IOException {
 
+		// idempotent: OK even if already stopped
 		sessionActive = false;
 		currentSessionId = null;
 
@@ -166,5 +192,3 @@ class ThreadServer extends Thread {
 		ps.println("OK");
 	}
 }
-
-		

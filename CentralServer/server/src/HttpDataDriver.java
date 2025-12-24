@@ -105,4 +105,13 @@ public class HttpDataDriver implements DataDriver {
         if (err != null) return err;
         return "OK";
     }
+
+    public synchronized boolean isSessionActive(String sessionId) {
+
+        String payload = "{\"sessionId\":\"" + sessionId + "\"}";
+        Document doc = postRequest("/session/active", payload);
+
+        if (doc == null) return false;
+        return doc.getInteger("error") == 0;
+    }
 }

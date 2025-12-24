@@ -107,13 +107,26 @@ public class MongoDataDriver implements DataDriver {
         return "OK "+m.getName()+","+m.getShortName()+","+m.getKey();
     }
 
-    public synchronized String saveMeasure(String type, String date, String value, String moduleKey) {
+    public synchronized String saveMeasure(
+            String type,
+            String date,
+            String value,
+            String moduleKey,
+            String sessionId   // ignoré ici
+    ) {
 
         ObjectId idModule = getModuleId(moduleKey);
         if (idModule == null) {
             return "ERR invalid module key";
         }
-        Measure m = new Measure(type, LocalDateTime.parse(date), value, idModule);
+
+        Measure m = new Measure(
+                type,
+                LocalDateTime.parse(date),
+                value,
+                idModule
+        );
+
         measures.insertOne(m);
         return "OK";
     }
@@ -122,5 +135,10 @@ public class MongoDataDriver implements DataDriver {
         Measure m = new Measure(type, LocalDateTime.parse(date), value, null);
         measures.insertOne(m);
         return "OK";
+    }
+
+    public boolean isSessionActive(String sessionId) {
+        // Mongo driver does NOT handle sessions
+        return true;
     }
 }

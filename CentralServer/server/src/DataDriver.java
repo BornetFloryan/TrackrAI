@@ -10,5 +10,7 @@ public interface DataDriver {
     public String saveAnalysis(String type, String date, String value);
     // register a module from its own request
     public String autoRegisterModule(String uc, List<String> chipsets);
+    // === SESSION CHECK ===
+    public boolean isSessionActive(String sessionId);
 
 }
