@@ -1,0 +1,37 @@
+services:
+  mongo:
+    image: mongo:4.4
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+
+  api:
+    image: node:20
+    working_dir: /app
+    volumes:
+      - ./TrackrAPI:/app
+    command: sh -c "npm install && npm run dev"
+    environment:
+      - MONGODB_URL=mongodb://mongo:27017/trackrai
+      - PORT=4567
+    ports:
+      - "4567:4567"
+    depends_on:
+      - mongo
+
+  frontend:
+    image: node:20
+    working_dir: /app
+    volumes:
+      - ./WebTrackr:/app
+    command: sh -c "npm install && npm run dev -- --host"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:4567/trackrapi
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  mongo-data:
