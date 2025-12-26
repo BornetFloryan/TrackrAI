@@ -1,12 +1,20 @@
 <template>
   <div>
-    <h1>Historique</h1>
+    <h1>Historique des séances</h1>
 
-    <ul>
+    <div v-if="store.loading">Chargement...</div>
+
+    <ul v-else>
       <li v-for="(group, day) in grouped" :key="day">
-        <router-link :to="`/sessions/${day}`">
-          {{ day }} — {{ group.length }} mesures
-        </router-link>
+        <strong>{{ day }}</strong>
+        <ul>
+          <li v-for="session in group" :key="session.id">
+            <router-link :to="`/sessions/${session.id}`">
+              {{ session.sportType || 'Sport' }} —
+              {{ formatDuration(session.duration) }}
+            </router-link>
+          </li>
+        </ul>
       </li>
     </ul>
   </div>
@@ -14,19 +22,29 @@
 
 <script setup>
 import { computed, onMounted } from 'vue'
-import { useMeasureStore } from '../store/measure.store'
+import { useSessionStore } from '../store/session.store'
 
-const store = useMeasureStore()
+const store = useSessionStore()
 
-onMounted(async () => await store.fetch())
+onMounted(async () => {
+  await store.fetchSessions()
+})
 
 const grouped = computed(() => {
   const byDay = {}
-  store.list.forEach(m => {
-    const d = new Date(m.date).toLocaleDateString()
-    if (!byDay[d]) byDay[d] = []
-    byDay[d].push(m)
+
+  store.sessions.forEach(s => {
+    const date = new Date(s.startTime || s.date).toLocaleDateString()
+    if (!byDay[date]) byDay[date] = []
+    byDay[date].push(s)
   })
+
   return byDay
 })
+
+function formatDuration(ms) {
+  if (!ms) return '—'
+  const min = Math.floor(ms / 60000)
+  return `${min} min`
+}
 </script>
