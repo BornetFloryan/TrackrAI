@@ -2,7 +2,7 @@ import axios from 'axios'
 import { useAuthStore } from '../store/auth.store'
 
 const api = axios.create({
-  baseURL: 'http://localhost:4567/trackrapi',
+  baseURL: 'http://api:4567/trackrapi',
 })
 
 api.interceptors.request.use((config) => {
