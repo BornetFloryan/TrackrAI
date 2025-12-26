@@ -222,7 +222,11 @@ void setupWiFi() {
   strcpy(server_host, p_server.getValue());
   strcpy(server_port, p_port.getValue());
 
-  Serial.println("WiFi connecté");
+  // ===== Sauvegarde en flash =====
+  prefs.putString("server_host", server_host);
+  prefs.putString("server_port", server_port);
+
+  Serial.println("Configuration serveur sauvegardée");
   Serial.printf("Serveur : %s:%s\n", server_host, server_port);
 }
 
@@ -239,6 +243,19 @@ void setup() {
     Serial.println("Module key = " + moduleKey);
   } else {
     Serial.println("Aucune moduleKey trouvée, auto-enregistrement requis");
+  }
+
+  String sh = prefs.getString("server_host", "");
+  String sp = prefs.getString("server_port", "");
+
+  if (sh.length() > 0) {
+    strcpy(server_host, sh.c_str());
+    Serial.println("Server host chargé depuis flash : " + sh);
+  }
+
+  if (sp.length() > 0) {
+    strcpy(server_port, sp.c_str());
+    Serial.println("Server port chargé depuis flash : " + sp);
   }
 
   setupWiFi();
@@ -261,15 +278,22 @@ void setup() {
   initBLE();
 }
 
+void sendHello() {
+  if (!tcp.connected()) return;
+  tcp.print("HELLO ");
+  tcp.println(moduleKey);
+  tcp.flush();
+  Serial.println("HELLO envoyé : " + moduleKey);
+}
+
 /* ================= LOOP ================= */
 void loop() {
-  
   handleServerCommands();
 
   while (gpsSerial.available())
     gps.encode(gpsSerial.read());
 
-  /* ===== TCP CONNECT ===== */
+  // 1) Assurer la connexion TCP (une seule connexion persistante)
   if (!tcp.connected()) {
     Serial.println("Connexion TCP...");
     if (!tcp.connect(server_host, atoi(server_port))) {
@@ -279,40 +303,44 @@ void loop() {
     }
     Serial.println("TCP connecté");
 
-    // identification du module auprès du serveur
-    tcp.print("HELLO ");
-    tcp.println(moduleKey);
-    tcp.flush();
-
-    if (moduleKey.length() > 0) {
-      registered = true;
+    // Si déjà enregistré, on s'identifie tout de suite
+    if (registered && moduleKey.length() > 0) {
+      sendHello();
     }
   }
 
+  // 2) Si pas enregistré : AUTOREGISTER sur LA MEME socket, puis HELLO
   if (!registered) {
     autoRegister();
+
+    // autoRegister() met registered=true + moduleKey si OK
+    if (registered && moduleKey.length() > 0) {
+      sendHello();          // IMPORTANT : même socket, tout de suite
+    }
+
     delay(500);
-    return;
+    return;                 // on laisse le serveur traiter + éventuellement envoyer START_SESSION
   }
 
-  /* ===== TIMING ===== */
+  // 3) Timing
   if (millis() - lastSend < SEND_INTERVAL) return;
   lastSend = millis();
 
+  // 4) On n'envoie des mesures que si session active
   if (!recording) return;
 
-  /* ===== GPS ===== */
+  // 5) GPS
   if (gps.location.isValid()) {
     sendMeasure("gps_lat", gps.location.lat());
     sendMeasure("gps_lon", gps.location.lng());
     sendMeasure("gps_speed", gps.speed.kmph());
   }
 
-  /* ===== HEART ===== */
+  // 6) HEART
   sendMeasure("heart_rate", heartRate);
   if (!isnan(rmssd)) sendMeasure("rmssd", rmssd);
 
-  /* ===== IMU ===== */
+  // 7) IMU
   int16_t ax, ay, az, gx, gy, gz;
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 
@@ -323,3 +351,4 @@ void loop() {
   sendMeasure("gyro_y", gy);
   sendMeasure("gyro_z", gz);
 }
+
