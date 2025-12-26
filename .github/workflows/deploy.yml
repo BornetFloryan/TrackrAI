@@ -26,8 +26,12 @@ jobs:
           ssh-keyscan -H ${{ secrets.SERVER_TAILSCALE_IP }} >> ~/.ssh/known_hosts
 
       - name: Deploy on server
+        env:
+          TS_SSH: "false"
         run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_TAILSCALE_IP }} << 'EOF'
-            set -e
-            bash /srv/sae/TrackrAI/deploy.sh
+          ssh -o PreferredAuthentications=publickey \
+          -o PubkeyAuthentication=yes \
+          ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_TAILSCALE_IP }} \
+          "bash /srv/sae/TrackrAI/deploy.sh"
+
           EOF
