@@ -10,13 +10,6 @@
       </option>
     </select>
 
-    <label>Sport :</label>
-    <select v-model="sport">
-      <option value="running">Course</option>
-      <option value="cycling">Vélo</option>
-      <option value="walking">Marche</option>
-    </select>
-
     <button @click="start" :disabled="!moduleKey || loading">Démarrer</button>
 
     <LiveMeasureCard label="Live BPM" :value="lastBpm" />
@@ -36,7 +29,6 @@ const session = useSessionStore()
 const { modules } = storeToRefs(moduleStore)
 
 const moduleKey = ref('')
-const sport = ref('running')
 const lastBpm = ref('--')
 const loading = ref(false)
 
@@ -51,8 +43,15 @@ onMounted(async () => {
   }
 })
 
-function start() {
+async function start() {
   if (!moduleKey.value) return
-  session.start(moduleKey.value, sport.value, '')
+
+  try {
+    await session.start(moduleKey.value)
+    alert('Session démarrée')
+  } catch (err) {
+    alert('Erreur démarrage session')
+    console.error(err)
+  }
 }
 </script>

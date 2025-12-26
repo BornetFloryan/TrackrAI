@@ -2,74 +2,42 @@ import { defineStore } from 'pinia'
 import sessionService from '../services/session.service'
 
 export const useSessionStore = defineStore('session', {
-  state: () => ({
-    /* ======================
-       SESSION EN COURS
-    ====================== */
-    current: null,
+    state: () => ({
+        sessionId: null,
+        loading: false,
+        error: null
+    }),
 
-    /* ======================
-       HISTORIQUE
-    ====================== */
-    sessions: [],
-    selected: null,
-    loading: false,
-  }),
+    actions: {
+        async start(moduleKey) {
+            this.loading = true
+            this.error = null
 
-  getters: {
-    /* ----- Runtime ----- */
-    isRunning: (state) => state.current !== null,
-    duration: (state) =>
-      state.current ? Date.now() - state.current.startTime : 0,
+            try {
+                const res = await sessionService.start(moduleKey)
+                this.sessionId = res.data.payload.sessionId
+                return this.sessionId
+            } catch (err) {
+                this.error = err.response?.data || err.message
+                throw err
+            } finally {
+                this.loading = false
+            }
+        },
 
-    /* ----- Historique ----- */
-    hasSessions: (state) => state.sessions.length > 0,
-  },
+        async stop() {
+            if (!this.sessionId) return
 
-  actions: {
-    /* ======================
-       SESSION EN COURS
-    ====================== */
-    start(moduleKey, sportType = 'running', notes = '') {
-      this.current = {
-        moduleKey,
-        sportType,
-        notes,
-        startTime: Date.now(),
-      }
-    },
-
-    async stop() {
-      if (!this.current) return
-
-      const payload = {
-        ...this.current,
-        endTime: Date.now(),
-        duration: Date.now() - this.current.startTime,
-      }
-
-      try {
-        await sessionService.saveSession(payload)
-      } catch (e) {
-        console.warn('Erreur sauvegarde session', e)
-      }
-
-      this.current = null
-    },
-
-    /* ======================
-       HISTORIQUE
-    ====================== */
-    async fetchSessions() {
-      this.loading = true
-      this.sessions = await sessionService.getSessions()
-      this.loading = false
-    },
-
-    async fetchSessionById(id) {
-      this.loading = true
-      this.selected = await sessionService.getSessionById(id)
-      this.loading = false
-    },
-  },
+            this.loading = true
+            try {
+                await sessionService.stop(this.sessionId)
+                this.sessionId = null
+            } catch (err) {
+                this.error = err.response?.data || err.message
+                throw err
+            } finally {
+                this.loading = false
+            }
+        }
+    }
 })
