@@ -10,174 +10,234 @@ const { answer } = require('./ControllerAnswer');
 const tcpService = require('../services/tcp.service');
 
 /**
- * START SESSION
- * Appelé par le FRONT
+ * START SESSION - appelé par le FRONT
  */
 const start = async function (req, res, next) {
-    answer.reset();
+  answer.reset();
 
-    const user = req.user;
-    const moduleKey = req.body.moduleKey;
+  const user = req.user;
+  const moduleKey = req.body.moduleKey;
 
-    if (!moduleKey) {
-        answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST));
-        return next(answer);
+  if (!moduleKey) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST));
+    return next(answer);
+  }
+
+  // vérifier module
+  let module;
+  try {
+    module = await Module.findOne({ key: moduleKey }).exec();
+    if (!module) {
+      answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_MODULE_KEY));
+      return next(answer);
     }
+  } catch (err) {
+    answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_FIND_MODULE_REQUEST));
+    return next(answer);
+  }
 
-    // vérifier le module
-    let module;
-    try {
-        module = await Module.findOne({ key: moduleKey }).exec();
-        if (!module) {
-            answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_MODULE_KEY));
-            return next(answer);
-        }
-    } catch (err) {
-        answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_FIND_MODULE_REQUEST));
-        return next(answer);
+  // refuser si session déjà active pour ce module
+  const active = await Session.findOne({
+    module: module._id,
+    endDate: { $exists: false },
+  }).exec();
+
+  if (active) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_ALREADY_ACTIVE));
+    return next(answer);
+  }
+
+  const sessionId = uuidv4();
+
+  // créer session Mongo
+  try {
+    const s = new Session({
+      sessionId,
+      user: user._id,
+      module: module._id,
+    });
+    await s.save();
+  } catch (err) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_CANNOT_CREATE));
+    return next(answer);
+  }
+
+  // notifier le serveur TCP Java
+  try {
+    const tcpResp = await tcpService.sendToCentralServer(
+      `START_SESSION_FOR_MODULE ${moduleKey} ${sessionId}`
+    );
+
+    // optionnel : si tu veux vérifier la réponse
+    // si le serveur répond "ERR ..." tu peux annuler la session Mongo
+    if (typeof tcpResp === 'string' && tcpResp.startsWith('ERR')) {
+      // rollback session Mongo
+      await Session.updateOne(
+        { sessionId },
+        { $set: { endDate: new Date() } }
+      ).exec();
+
+      answer.set({ error: 999, status: 500, data: tcpResp });
+      return next(answer);
     }
+  } catch (err) {
+    // ICI tu choisis : bloquant ou non.
+    // Pour éviter une session "active" sans démarrage module => on bloque
+    await Session.updateOne(
+      { sessionId },
+      { $set: { endDate: new Date() } }
+    ).exec();
 
-    // refuser si session déjà active
-    const active = await Session.findOne({
-        module: module._id,
-        endDate: { $exists: false }
-    }).exec();
+    answer.set({ error: 999, status: 500, data: 'Impossible de contacter le serveur central' });
+    return next(answer);
+  }
 
-    if (active) {
-        answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_ALREADY_ACTIVE));
-        return next(answer);
-    }
-
-    const sessionId = uuidv4();
-
-    try {
-        const s = new Session({
-            sessionId,
-            user: user._id,
-            module: module._id
-        });
-        await s.save();
-    } catch (err) {
-        answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_CANNOT_CREATE));
-        return next(answer);
-    }
-
-    // NOTIFICATION TCP AU SERVEUR CENTRAL
-    try {
-        await tcpService.sendToCentralServer(
-            `START_SESSION_FOR_MODULE ${moduleKey} ${sessionId}`
-        );
-    } catch (err) {
-        console.error('[TCP] START_SESSION_FOR_MODULE failed:', err.message);
-        // volontairement NON bloquant
-    }
-
-    answer.setPayload({ sessionId });
-    res.status(201).send(answer);
+  answer.setPayload({ sessionId });
+  return res.status(201).send(answer);
 };
 
 /**
- * STOP SESSION
- * Appelé par le FRONT
+ * STOP SESSION - appelé par le FRONT
+ * Le serveur TCP attend un moduleKey => on stop au moduleKey.
  */
 const stop = async function (req, res, next) {
-    console.log('STOP session controller');
-    answer.reset();
+  answer.reset();
 
-    const moduleKey = req.body.moduleKey;
-    if (!moduleKey) {
-        answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST));
-        return next(answer);
+  const moduleKey = req.body.moduleKey;
+  if (!moduleKey) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST));
+    return next(answer);
+  }
+
+  // vérifier module
+  let module;
+  try {
+    module = await Module.findOne({ key: moduleKey }).exec();
+    if (!module) {
+      answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_MODULE_KEY));
+      return next(answer);
     }
+  } catch (err) {
+    answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_FIND_MODULE_REQUEST));
+    return next(answer);
+  }
 
-    let module;
-    try {
-        module = await Module.findOne({ key: moduleKey }).exec();
-        if (!module) {
-            answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_MODULE_KEY));
-            return next(answer);
-        }
-    } catch (err) {
-        answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_FIND_MODULE_REQUEST));
-        return next(answer);
+  // récupérer la session active pour ce module
+  let session;
+  try {
+    session = await Session.findOne({
+      module: module._id,
+      endDate: { $exists: false },
+    }).exec();
+
+    if (!session) {
+      answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
+      return next(answer);
     }
+  } catch (err) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
+    return next(answer);
+  }
 
-    let session;
-    try {
-        session = await Session.findOne({
-            module: module._id,
-            endDate: { $exists: false }
-        }).exec();
+  // notifier le serveur TCP Java (bloquant pour éviter que l’ESP continue)
+  try {
+    const tcpResp = await tcpService.sendToCentralServer(
+      `STOP_SESSION_FOR_MODULE ${moduleKey}`
+    );
 
-        if (!session) {
-            answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
-            return next(answer);
-        }
-    } catch (err) {
-        answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
-        return next(answer);
+    if (typeof tcpResp === 'string' && tcpResp.startsWith('ERR')) {
+      answer.set({ error: 999, status: 500, data: tcpResp });
+      return next(answer);
     }
+  } catch (err) {
+    answer.set({ error: 999, status: 500, data: 'Impossible de contacter le serveur central' });
+    return next(answer);
+  }
 
-    try {
-        await tcpService.sendToCentralServer(
-            `STOP_SESSION_FOR_MODULE ${moduleKey}`
-        );
-    } catch (err) {
-        console.error('[TCP] STOP_SESSION_FOR_MODULE failed:', err.message);
-        answer.set({
-            error: 999,
-            status: 500,
-            data: 'Impossible de contacter le serveur central'
-        });
-        return next(answer);
-    }
+  // fermer la session Mongo
+  session.endDate = new Date();
+  try {
+    await session.save();
+  } catch (err) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_CANNOT_CLOSE));
+    return next(answer);
+  }
 
-    // 4️⃣ fermer la session Mongo
-    session.endDate = new Date();
-    try {
-        await session.save();
-    } catch (err) {
-        answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_CANNOT_CLOSE));
-        return next(answer);
-    }
-
-    res.status(200).send(answer);
+  return res.status(200).send(answer);
 };
 
 /**
- * CHECK SESSION ACTIVE
- * utilisé par le serveur TCP Java
+ * CHECK SESSION ACTIVE - utilisé par le serveur TCP Java
+ * (il envoie sessionId)
  */
 const active = async function (req, res, next) {
-    answer.reset();
+  answer.reset();
 
-    const sessionId = req.body.sessionId;
+  const sessionId = req.body.sessionId;
+  if (!sessionId) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST));
+    return next(answer);
+  }
 
-    if (!sessionId) {
-        answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST));
-        return next(answer);
+  try {
+    const session = await Session.findOne({
+      sessionId,
+      endDate: { $exists: false },
+    }).exec();
+
+    if (!session) {
+      answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
+      return next(answer);
     }
+  } catch (err) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
+    return next(answer);
+  }
 
-    try {
-        const session = await Session.findOne({
-            sessionId,
-            endDate: { $exists: false }
-        }).exec();
+  return res.status(200).send(answer);
+};
 
-        if (!session) {
-            answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
-            return next(answer);
-        }
-    } catch (err) {
-        answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
-        return next(answer);
+/**
+ * ACTIVE FOR MODULE - utilisé par le FRONT (reprise après refresh)
+ */
+const activeForModule = async function (req, res, next) {
+  answer.reset();
+
+  const moduleKey = req.body.moduleKey;
+  if (!moduleKey) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST));
+    return next(answer);
+  }
+
+  let module;
+  try {
+    module = await Module.findOne({ key: moduleKey }).exec();
+    if (!module) {
+      answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_MODULE_KEY));
+      return next(answer);
     }
+  } catch (err) {
+    answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_FIND_MODULE_REQUEST));
+    return next(answer);
+  }
 
-    res.status(200).send(answer);
+  const session = await Session.findOne({
+    module: module._id,
+    endDate: { $exists: false },
+  }).exec();
+
+  if (!session) {
+    answer.setPayload({ active: false });
+    return res.status(200).send(answer);
+  }
+
+  answer.setPayload({ active: true, sessionId: session.sessionId });
+  return res.status(200).send(answer);
 };
 
 module.exports = {
-    start,
-    stop,
-    active
+  start,
+  stop,
+  active,
+  activeForModule,
 };

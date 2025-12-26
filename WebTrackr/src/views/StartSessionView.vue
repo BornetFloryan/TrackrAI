@@ -3,25 +3,29 @@
     <h2>Démarrer une séance</h2>
 
     <label>Module :</label>
-    <select v-model="moduleKey" :disabled="loading || session.sessionId"> 
+    <select v-model="moduleKey" :disabled="loading || session.sessionId">
       <option disabled value="">{{ loading ? 'Chargement...' : 'Sélectionner...' }}</option>
       <option v-for="m in modules" :value="m.key" :key="m._id">
         {{ m.name }}
       </option>
     </select>
 
-    {{ session }}
+    <pre>{{ session }}</pre>
 
-    <button @click="start" :disabled="!moduleKey || loading || session.sessionId">Démarrer</button>
-    <button @click="stop" >Stop</button> <!-- :disabled="!session.sessionId || loading" -->
+    <button @click="start" :disabled="!moduleKey || loading || session.sessionId">
+      Démarrer
+    </button>
 
+    <button @click="stop" :disabled="!session.sessionId || loading">
+      Stop
+    </button>
 
     <LiveMeasureCard label="Live BPM" :value="lastBpm" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useModuleStore } from '../store/module.store'
 import { useSessionStore } from '../store/session.store'
@@ -29,7 +33,6 @@ import LiveMeasureCard from '../components/LiveMeasureCard.vue'
 
 const moduleStore = useModuleStore()
 const session = useSessionStore()
-
 const { modules } = storeToRefs(moduleStore)
 
 const moduleKey = ref('')
@@ -40,16 +43,24 @@ onMounted(async () => {
   loading.value = true
   try {
     await moduleStore.fetch()
-  } catch (err) {
-    console.error('Erreur fetch modules:', err)
   } finally {
     loading.value = false
   }
 })
 
+watch(moduleKey, async (mk) => {
+  if (!mk) return;
+
+  try {
+    await session.syncActiveForModule(mk);
+  } catch (e) {
+    console.error(e);
+  }
+});
+
+
 async function start() {
   if (!moduleKey.value) return
-
   try {
     await session.start(moduleKey.value)
     alert('Session démarrée')
@@ -61,7 +72,7 @@ async function start() {
 
 async function stop() {
   try {
-    await session.stop(moduleKey.value)
+    await session.stop()
     moduleKey.value = ''
     alert('Session arrêtée')
   } catch (err) {
@@ -69,5 +80,4 @@ async function stop() {
     console.error(err)
   }
 }
-
 </script>

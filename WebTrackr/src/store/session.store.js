@@ -2,46 +2,73 @@ import { defineStore } from 'pinia';
 import sessionService from '../services/session.service';
 
 export const useSessionStore = defineStore('session', {
-    state: () => ({
-        sessionId: null,
-        loading: false,
-        error: null
-    }),
+  state: () => ({
+    sessionId: null,
+    moduleKey: null,
+    loading: false,
+    error: null,
+  }),
 
-    actions: {
-        async start(moduleKey) {
-            this.loading = true;
-            this.error = null;
+  actions: {
+    async start(moduleKey) {
+      this.loading = true;
+      this.error = null;
 
-            try {
-                const res = await sessionService.start(moduleKey);
-                this.sessionId = res.data.data.sessionId;
-                return this.sessionId;
-            } catch (err) {
-                this.error = err.response?.data || err.message;
-                throw err;
-            } finally {
-                this.loading = false;
-            }
-        },
+      try {
+        const res = await sessionService.start(moduleKey);
+        this.sessionId = res.data.data.sessionId;
+        this.moduleKey = moduleKey;
+        return this.sessionId;
+      } catch (err) {
+        this.error = err.response?.data || err.message;
+        throw err;
+      } finally {
+        this.loading = false;
+      }
+    },
 
-        async stop(moduleKey) {
-            console.log("Attempting to stop session...");
-            console.log("Current moduleKey:", moduleKey);
-            if (!moduleKey) return;
+    async stop() {
+      if (!this.moduleKey || !this.sessionId) return;
 
-            this.loading = true;
-            try {
-                console.log("Stopping session with moduleKey:", moduleKey);
-                await sessionService.stop(moduleKey);
-                console.log("Session stopped successfully.");
-                this.sessionId = null;
-            } catch (err) {
-                this.error = err.response?.data || err.message;
-                throw err;
-            } finally {
-                this.loading = false;
-            }
+      this.loading = true;
+      this.error = null;
+
+      try {
+        await sessionService.stop(this.moduleKey);
+        this.sessionId = null;
+        this.moduleKey = null;
+      } catch (err) {
+        this.error = err.response?.data || err.message;
+        throw err;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async syncActiveForModule(moduleKey) {
+      this.loading = true;
+      this.error = null;
+
+      try {
+        const res = await sessionService.activeForModule(moduleKey);
+        console.log('syncActiveForModule response:', res);
+        const payload = res.data.data;
+
+        if (payload?.active) {
+          this.sessionId = payload.sessionId;
+          this.moduleKey = moduleKey;
+        } else {
+          this.sessionId = null;
+          this.moduleKey = null;
         }
+
+        return payload;
+      } catch (err) {
+        this.error = err.response?.data || err.message;
+        throw err;
+      } finally {
+        this.loading = false;
+      }
     }
+  }
 });
