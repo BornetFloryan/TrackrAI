@@ -15,7 +15,7 @@ export const useSessionStore = defineStore('session', {
 
             try {
                 const res = await sessionService.start(moduleKey)
-                this.sessionId = res.data.payload.sessionId
+                this.sessionId = res.data.data.sessionId
                 return this.sessionId
             } catch (err) {
                 this.error = err.response?.data || err.message

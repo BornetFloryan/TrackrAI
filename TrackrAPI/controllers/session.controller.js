@@ -7,16 +7,15 @@ const SessionErrors = require('../commons/session.errors');
 const ModuleErrors = require('../commons/module.errors');
 
 const { answer } = require('./ControllerAnswer');
+const tcpService = require('../services/tcp.service');
 
 /**
  * START SESSION
  */
-const start = async function(req, res, next) {
-
+const start = async function (req, res, next) {
     answer.reset();
-
-    let user = req.user;
-    let moduleKey = req.body.moduleKey;
+    const user = req.user;
+    const moduleKey = req.body.moduleKey;
 
     if (!moduleKey) {
         answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST));
@@ -35,8 +34,8 @@ const start = async function(req, res, next) {
         return next(answer);
     }
 
-    // check if a session is already active for this module
-    let active = await Session.findOne({
+    // Vérifier session active
+    const active = await Session.findOne({
         module: module._id,
         endDate: { $exists: false }
     }).exec();
@@ -46,18 +45,27 @@ const start = async function(req, res, next) {
         return next(answer);
     }
 
-    let sessionId = uuidv4();
+    const sessionId = uuidv4();
 
     try {
-        let s = new Session({
+        const s = new Session({
             sessionId,
             user: user._id,
-            module: module._id,
+            module: module._id
         });
         await s.save();
     } catch (err) {
         answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_CANNOT_CREATE));
         return next(answer);
+    }
+
+    try {
+        await tcpService.sendToCentralServer(
+            `START_SESSION ${sessionId} ${moduleKey}`
+        );
+    } catch (err) {
+        console.error('[TCP] START_SESSION failed:', err.message);
+        // volontairement NON bloquant
     }
 
     answer.setPayload({ sessionId });
@@ -67,11 +75,11 @@ const start = async function(req, res, next) {
 /**
  * STOP SESSION
  */
-const stop = async function(req, res, next) {
-
+const stop = async function (req, res, next) {
     answer.reset();
 
-    let sessionId = req.body.sessionId;
+    const sessionId = req.body.sessionId;
+
     if (!sessionId) {
         answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST));
         return next(answer);
@@ -102,25 +110,32 @@ const stop = async function(req, res, next) {
         return next(answer);
     }
 
+    try {
+        await tcpService.sendToCentralServer(
+            `STOP_SESSION ${sessionId}`
+        );
+    } catch (err) {
+        console.error('[TCP] STOP_SESSION failed:', err.message);
+    }
+
     res.status(200).send(answer);
 };
 
 /**
  * CHECK SESSION ACTIVE (used by TCP server)
  */
-const active = async function(req, res, next) {
-
+const active = async function (req, res, next) {
     answer.reset();
 
-    let sessionId = req.body.sessionId;
+    const sessionId = req.body.sessionId;
+
     if (!sessionId) {
         answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST));
         return next(answer);
     }
 
-    let session;
     try {
-        session = await Session.findOne({
+        const session = await Session.findOne({
             sessionId,
             endDate: { $exists: false }
         }).exec();
@@ -129,15 +144,13 @@ const active = async function(req, res, next) {
             answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
             return next(answer);
         }
-    }
-    catch (err) {
+    } catch (err) {
         answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
         return next(answer);
     }
 
     res.status(200).send(answer);
 };
-
 
 module.exports = {
     start,
