@@ -3,14 +3,18 @@
     <h2>Démarrer une séance</h2>
 
     <label>Module :</label>
-    <select v-model="moduleKey" :disabled="loading">
+    <select v-model="moduleKey" :disabled="loading || session.sessionId"> 
       <option disabled value="">{{ loading ? 'Chargement...' : 'Sélectionner...' }}</option>
       <option v-for="m in modules" :value="m.key" :key="m._id">
         {{ m.name }}
       </option>
     </select>
 
-    <button @click="start" :disabled="!moduleKey || loading">Démarrer</button>
+    {{ session }}
+
+    <button @click="start" :disabled="!moduleKey || loading || session.sessionId">Démarrer</button>
+    <button @click="stop" >Stop</button> <!-- :disabled="!session.sessionId || loading" -->
+
 
     <LiveMeasureCard label="Live BPM" :value="lastBpm" />
   </div>
@@ -54,4 +58,16 @@ async function start() {
     console.error(err)
   }
 }
+
+async function stop() {
+  try {
+    await session.stop(moduleKey.value)
+    moduleKey.value = ''
+    alert('Session arrêtée')
+  } catch (err) {
+    alert('Erreur arrêt session')
+    console.error(err)
+  }
+}
+
 </script>

@@ -1,22 +1,15 @@
-import api from './api.service'
+import api from './api.service';
 
 export default {
-    start(moduleKey, sport) {
-        return api.post('/session/start', {
-            moduleKey,
-            sport
-        })
+    start(moduleKey) {
+        return api.post('/session/start', { moduleKey });
     },
 
-    stop(sessionId) {
-        return api.post('/session/stop', {
-            sessionId
-        })
+    stop(moduleKey) {
+        return api.post('/session/stop', { moduleKey });
     },
 
     active(sessionId) {
-        return api.post('/session/active', {
-            sessionId
-        })
+        return api.post('/session/active', { sessionId });
     }
-}
+};
