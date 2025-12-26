@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Trackr deploy start ==="
+echo "=== DEPLOY TRIGGERED BY GITHUB ACTIONS ==="
 
 cd /srv/sae/TrackrAI
 
