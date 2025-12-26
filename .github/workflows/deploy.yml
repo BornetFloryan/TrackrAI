@@ -1,0 +1,23 @@
+name: Deploy TrackrAI (Tailscale)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Deploy on server
+        run: |
+          tailscale ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_TAILSCALE_IP }} \
+            "bash /srv/sae/TrackrAI/deploy.sh"

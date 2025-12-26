@@ -41,5 +41,14 @@ services:
       - CENTRAL_HOST=trackr-central
       - CENTRAL_PORT=9000
 
+  frontend:
+    build: ./WebTrackr
+    container_name: trackr-frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
 volumes:
   mongo-data:
