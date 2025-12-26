@@ -1,5 +1,5 @@
-import { defineStore } from 'pinia'
-import sessionService from '../services/session.service'
+import { defineStore } from 'pinia';
+import sessionService from '../services/session.service';
 
 export const useSessionStore = defineStore('session', {
     state: () => ({
@@ -10,34 +10,38 @@ export const useSessionStore = defineStore('session', {
 
     actions: {
         async start(moduleKey) {
-            this.loading = true
-            this.error = null
+            this.loading = true;
+            this.error = null;
 
             try {
-                const res = await sessionService.start(moduleKey)
-                this.sessionId = res.data.data.sessionId
-                return this.sessionId
+                const res = await sessionService.start(moduleKey);
+                this.sessionId = res.data.data.sessionId;
+                return this.sessionId;
             } catch (err) {
-                this.error = err.response?.data || err.message
-                throw err
+                this.error = err.response?.data || err.message;
+                throw err;
             } finally {
-                this.loading = false
+                this.loading = false;
             }
         },
 
-        async stop() {
-            if (!this.sessionId) return
+        async stop(moduleKey) {
+            console.log("Attempting to stop session...");
+            console.log("Current moduleKey:", moduleKey);
+            if (!moduleKey) return;
 
-            this.loading = true
+            this.loading = true;
             try {
-                await sessionService.stop(this.sessionId)
-                this.sessionId = null
+                console.log("Stopping session with moduleKey:", moduleKey);
+                await sessionService.stop(moduleKey);
+                console.log("Session stopped successfully.");
+                this.sessionId = null;
             } catch (err) {
-                this.error = err.response?.data || err.message
-                throw err
+                this.error = err.response?.data || err.message;
+                throw err;
             } finally {
-                this.loading = false
+                this.loading = false;
             }
         }
     }
-})
+});

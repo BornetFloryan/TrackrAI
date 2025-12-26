@@ -13,7 +13,7 @@
     {{ session }}
 
     <button @click="start" :disabled="!moduleKey || loading || session.sessionId">Démarrer</button>
-    <button @click="stop" :disabled="!session.sessionId || loading">Stop</button>
+    <button @click="stop" >Stop</button> <!-- :disabled="!session.sessionId || loading" -->
 
 
     <LiveMeasureCard label="Live BPM" :value="lastBpm" />
@@ -61,7 +61,7 @@ async function start() {
 
 async function stop() {
   try {
-    await session.stop()
+    await session.stop(moduleKey.value)
     moduleKey.value = ''
     alert('Session arrêtée')
   } catch (err) {
