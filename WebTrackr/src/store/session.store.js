@@ -16,7 +16,7 @@ export const useSessionStore = defineStore('session', {
 
       try {
         const res = await sessionService.start(moduleKey);
-        this.sessionId = res.data.data.sessionId;
+        this.sessionId = res.sessionId;
         this.moduleKey = moduleKey;
         return this.sessionId;
       } catch (err) {
@@ -51,7 +51,6 @@ export const useSessionStore = defineStore('session', {
 
       try {
         const res = await sessionService.activeForModule(moduleKey);
-        console.log('syncActiveForModule response:', res);
         const payload = res.data.data;
 
         if (payload?.active) {
@@ -69,6 +68,15 @@ export const useSessionStore = defineStore('session', {
       } finally {
         this.loading = false;
       }
+    },
+    async fetchHistory() {
+      this.loading = true
+      try {
+      return await sessionService.history()
+      } finally {
+        this.loading = false
+      }
     }
+    
   }
 });

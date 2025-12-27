@@ -67,6 +67,7 @@ const start = async function (req, res, next) {
     const tcpResp = await tcpService.sendToCentralServer(
       `START_SESSION_FOR_MODULE ${moduleKey} ${sessionId}`
     );
+    console.log('TCP response:', tcpResp);
 
     // optionnel : si tu veux vérifier la réponse
     // si le serveur répond "ERR ..." tu peux annuler la session Mongo
@@ -235,9 +236,58 @@ const activeForModule = async function (req, res, next) {
   return res.status(200).send(answer);
 };
 
+/**
+ * HISTORIQUE DES SESSIONS
+ * - admin : toutes les sessions
+ * - autres : uniquement celles du user connecté
+ */
+const history = async function (req, res, next) {
+  answer.reset()
+
+  if (!req.user) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_AUTHORIZED))
+    return next(answer)
+  }
+
+  const user = req.user
+  const isAdmin = user.rights.includes('admin')
+  const isCoach = user.rights.includes('coach')
+
+  const filter = {}
+  if (!isAdmin && !isCoach) {
+    filter.user = user._id
+  }
+
+  try {
+    const sessions = await Session.find(filter)
+      .populate({
+        path: 'module',
+        select: 'name uc key',
+        options: { strictPopulate: false },
+      })
+      .populate({
+        path: 'user',
+        select: 'login',
+        options: { strictPopulate: false },
+      })
+      .sort({ startDate: -1 })
+      .lean()
+      .exec()
+
+    answer.setPayload(sessions)
+    return res.status(200).send(answer)
+  } catch (err) {
+    console.error('SESSION HISTORY ERROR:', err)
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_FIND_REQUEST))
+    return next(answer)
+  }
+}
+
+
 module.exports = {
   start,
   stop,
   active,
   activeForModule,
+  history,
 };

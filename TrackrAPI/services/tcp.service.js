@@ -14,6 +14,7 @@ function sendToCentralServer(message) {
 
     client.on('data', (data) => {
       received += data.toString();
+      console.log('Received from TCP server:', data.toString());
 
       if (received.includes('\n')) {
         resolve(received.trim());

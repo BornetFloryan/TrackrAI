@@ -9,7 +9,7 @@ let MeasureSchema = new Schema({
     // value, as a string to be universal
     value: {type: String, required: true},
     // if the measure comes from a module, store it
-    module: {type: Schema.Types.ObjectId, ref: 'Module'},
+    module: {type: Schema.Types.ObjectId, ref: 'Modules'},
     // session id
     session: { type: Schema.Types.ObjectId, ref: 'Session' },
 },{versionKey: false});

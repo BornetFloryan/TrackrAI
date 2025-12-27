@@ -81,6 +81,7 @@ const signIn = async function (req, res, next) {
     return next(answer);
   }
 
+
   // here should add a jwt token creation, or something else
   // to provide a secure authentication for following requests
   // For now just generate a random session id that must be prodvided in next requests.

@@ -1,72 +1,52 @@
-import { defineStore } from 'pinia'
-import axios from 'axios'
-import authService from '../services/auth.service'
+import { defineStore } from "pinia";
+import authService from "../services/auth.service";
 
-export const useAuthStore = defineStore('auth', {
+export const useAuthStore = defineStore("auth", {
   state: () => ({
-    token: localStorage.getItem('trackr_token') || null,
-    rights: JSON.parse(localStorage.getItem('trackr_rights') || '[]'),
-    login: localStorage.getItem('trackr_login') || null,
+    token: localStorage.getItem("trackr_token") || null,
+    rights: JSON.parse(localStorage.getItem("trackr_rights") || "[]"),
+    login: localStorage.getItem("trackr_login") || null,
   }),
 
   getters: {
-    isAdmin: (state) => state.rights.includes('admin'),
-    isAuthenticated: (state) => !!state.token,
+    isAuthenticated: (s) => !!s.token,
+    isAdmin: (s) => Array.isArray(s.rights) && s.rights.includes("admin"),
+    isCoach: (s) => Array.isArray(s.rights) && s.rights.includes("coach"),
   },
 
   actions: {
     async signin(login, password) {
-      delete axios.defaults.headers.common['Authorization']
+      const answer = await authService.login(login, password);
 
-      const answer = await authService.login(login, password)
-
-      if (answer.error && answer.error !== 0) {
-        throw new Error(answer.data || 'Erreur de connexion')
+      if (!answer || !answer.token) {
+        throw new Error("AUTH_FAILED");
       }
 
-      const payload = answer.data || {}
-      this.token = payload.token || null
-      this.rights = payload.rights || []
-      this.login = login
+      this.token = answer.token;
+      this.rights = answer.rights || [];
+      this.login = login;
 
-      if (this.token) {
-        axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`
-        localStorage.setItem('trackr_token', this.token)
-      } else {
-        delete axios.defaults.headers.common['Authorization']
-        localStorage.removeItem('trackr_token')
-      }
+      localStorage.setItem("trackr_token", this.token);
+      localStorage.setItem("trackr_rights", JSON.stringify(this.rights));
+      localStorage.setItem("trackr_login", login);
 
-      localStorage.setItem('trackr_rights', JSON.stringify(this.rights))
-      localStorage.setItem('trackr_login', this.login || '')
-
-      return payload
+      return answer;
     },
 
     logout() {
-      this.token = null
-      this.rights = []
-      this.login = null
+      this.token = null;
+      this.rights = [];
+      this.login = null;
 
-      delete axios.defaults.headers.common['Authorization']
-      localStorage.removeItem('trackr_token')
-      localStorage.removeItem('trackr_rights')
-      localStorage.removeItem('trackr_login')
+      localStorage.removeItem("trackr_token");
+      localStorage.removeItem("trackr_rights");
+      localStorage.removeItem("trackr_login");
     },
 
     restore() {
-      const token = localStorage.getItem('trackr_token')
-      if (token) {
-        this.token = token
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-      } else {
-        this.token = null
-        delete axios.defaults.headers.common['Authorization']
-      }
-
-      const rights = localStorage.getItem('trackr_rights')
-      this.rights = rights ? JSON.parse(rights) : []
-      this.login = localStorage.getItem('trackr_login') || null
+      this.token = localStorage.getItem("trackr_token");
+      this.rights = JSON.parse(localStorage.getItem("trackr_rights") || "[]");
+      this.login = localStorage.getItem("trackr_login");
     },
   },
-})
+});

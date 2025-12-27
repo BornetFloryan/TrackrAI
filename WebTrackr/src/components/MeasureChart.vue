@@ -1,7 +1,13 @@
 <template>
-  <div class="chart">
-    <Line v-if="measures.length" :data="chartData" :options="chartOptions" />
-    <p v-else>Aucune donnée</p>
+  <div class="card">
+    <div class="top">
+      <div class="title">{{ title }}</div>
+      <span class="badge" v-if="unit">{{ unit }}</span>
+    </div>
+    <div class="chart">
+      <Line v-if="series.length" :data="chartData" :options="chartOptions" />
+      <p v-else style="color:var(--muted); margin:0">Aucune donnée</p>
+    </div>
   </div>
 </template>
 
@@ -10,67 +16,36 @@ import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
-  LineElement,
-  PointElement,
-  LinearScale,
-  CategoryScale,
-  Tooltip,
-  Legend
+  LineElement, PointElement,
+  LinearScale, CategoryScale,
+  Tooltip, Legend
 } from 'chart.js'
-
-ChartJS.register(
-  LineElement,
-  PointElement,
-  LinearScale,
-  CategoryScale,
-  Tooltip,
-  Legend
-)
+ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend)
 
 const props = defineProps({
-  measures: { type: Array, required: true },
-  type: { type: String, default: 'hr' }, // hr | speed | cadence
+  title: { type: String, default: 'Mesure' },
+  unit: { type: String, default: '' },
+  series: { type: Array, default: () => [] }, // [{date: Date, value:number}]
 })
 
-const config = {
-  hr: { label: 'Fréquence cardiaque', unit: 'BPM', color: '#ef4444' },
-  speed: { label: 'Vitesse', unit: 'km/h', color: '#3b82f6' },
-  cadence: { label: 'Cadence', unit: 'spm', color: '#10b981' },
-}
-
-const chartData = computed(() => {
-  const c = config[props.type]
-
-  return {
-    labels: props.measures.map(m =>
-      new Date(m.date).toLocaleTimeString()
-    ),
-    datasets: [
-      {
-        label: `${c.label} (${c.unit})`,
-        data: props.measures.map(m => Number(m.value) || 0),
-        borderColor: c.color,
-        backgroundColor: 'transparent',
-        tension: 0.3,
-      },
-    ],
-  }
-})
+const chartData = computed(() => ({
+  labels: props.series.map(p => new Date(p.date).toLocaleTimeString()),
+  datasets: [{
+    label: props.title,
+    data: props.series.map(p => Number(p.value) || 0),
+    tension: 0.25,
+  }]
+}))
 
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: {
-    legend: { display: true },
-  },
-  scales: {
-    y: { beginAtZero: false },
-  },
+  plugins: { legend: { display: false } },
 }
 </script>
 
 <style scoped>
-.chart {
-  height: 300px;
-}
+.top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:.5rem; }
+.title{ color:var(--muted); font-weight:650; }
+.chart{ height: 280px; }
 </style>

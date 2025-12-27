@@ -7,7 +7,7 @@ let SessionSchema = new Schema({
 
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
 
-    module: { type: Schema.Types.ObjectId, ref: 'Module', required: true },
+    module: { type: Schema.Types.ObjectId, ref: 'Modules', required: true },
 
     startDate: { type: Date, required: true, default: Date.now },
 

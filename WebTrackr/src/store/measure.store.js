@@ -7,13 +7,8 @@ export const useMeasureStore = defineStore('measure', {
   }),
 
   actions: {
-    async fetch(moduleKey = null) {
-      try {
-        this.list = await measureService.getMeasures(moduleKey)
-      } catch (err) {
-        console.error('Erreur fetch measures :', err)
-        this.list = []
-      }
+    async fetch(moduleKey = null, after = null, until = null) {
+      this.list = await measureService.getMeasures(moduleKey, after, until)
       return this.list
     },
   },

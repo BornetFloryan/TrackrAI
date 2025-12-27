@@ -1,19 +1,27 @@
-import api from './api.service';
+import api from './api.service'
 
 export default {
-  start(moduleKey) {
-    return api.post('/session/start', { moduleKey });
+  async start(moduleKey) {
+    const res = await api.post('/session/start', { moduleKey })
+    if (res.data.error !== 0) throw new Error(res.data.data)
+    return res.data.data // { sessionId }
   },
 
-  stop(moduleKey) {
-    return api.post('/session/stop', { moduleKey });
+  async stop(moduleKey) {
+    const res = await api.post('/session/stop', { moduleKey })
+    if (res.data.error !== 0) throw new Error(res.data.data)
+    return true
   },
 
-  active(sessionId) {
-    return api.post('/session/active', { sessionId });
+  async activeForModule(moduleKey) {
+    const res = await api.post('/session/active-for-module', { moduleKey })
+    if (res.data.error !== 0) throw new Error(res.data.data)
+    return res.data.data
   },
 
-  activeForModule(moduleKey) {
-    return api.post('/session/active-for-module', { moduleKey });
-  }
-};
+  async history() {
+    const res = await api.get('/session/history')
+    if (res.data.error !== 0) throw new Error(res.data.data)
+    return res.data.data
+  },
+}
