@@ -222,7 +222,6 @@ class ThreadServer extends Thread {
 	}
 
 	protected void requestStartSessionForModule(String[] params) throws IOException {
-
 		if (params.length != 3) {
 			ps.println("ERR invalid parameters");
 			return;
