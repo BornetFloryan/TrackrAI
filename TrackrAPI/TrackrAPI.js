@@ -1,5 +1,6 @@
 // core imports
 require('dotenv').config();
+require('./services/session.service')
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require("cors");

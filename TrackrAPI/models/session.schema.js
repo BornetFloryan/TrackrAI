@@ -11,6 +11,8 @@ let SessionSchema = new Schema({
 
     startDate: { type: Date, required: true, default: Date.now },
 
+    lastMeasureAt: { type: Date },
+
     endDate: { type: Date }
 
 },{ versionKey: false });

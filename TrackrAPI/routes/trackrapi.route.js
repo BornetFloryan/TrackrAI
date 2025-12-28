@@ -16,6 +16,7 @@ router.get('/measure/get', asyncRoute(measureController.getMeasures));
 
 router.post('/module/register', asyncRoute(moduleController.register));
 router.post('/module/create', asyncRoute(moduleController.create));
+router.post('/module/connection', asyncRoute(moduleController.connection))
 router.patch('/module/update', asyncRoute(moduleController.update));
 router.get('/module/get', asyncRoute(moduleController.getModules));
 
@@ -25,17 +26,11 @@ router.get('/user/getusers', asyncRoute(userController.getUsers));
 
 router.post('/auth/signin', asyncRoute(authController.signIn));
 
-// sessions
 router.post('/session/start', asyncRoute(authController.verifyToken), asyncRoute(sessionController.start));
 router.post('/session/stop', asyncRoute(authController.verifyToken), asyncRoute(sessionController.stop));
 router.post('/session/active', asyncRoute(sessionController.active));
 router.post('/session/active-for-module', asyncRoute(authController.verifyToken), asyncRoute(sessionController.activeForModule));
-
-router.get(
-  '/session/history',
-  asyncRoute(authController.verifyToken),
-  asyncRoute(sessionController.history)
-)
+router.get('/session/history', asyncRoute(authController.verifyToken), asyncRoute(sessionController.history));
 
 
 module.exports = router;

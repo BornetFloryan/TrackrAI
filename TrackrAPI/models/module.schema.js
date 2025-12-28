@@ -9,6 +9,9 @@ let ModuleSchema = new Schema({
   uc: { type: String, required: true}, // the type of µC within
   // chipsets are the different chipset that are hosted within an acquisition module
   chipsets: [{type: Schema.Types.ObjectId, required: true, ref: 'Chipset'}],
+
+  connected: { type: Boolean, default: false },
+  lastSeen: { type: Date },
 },{versionKey: false});
 
 module.exports = ModuleSchema;

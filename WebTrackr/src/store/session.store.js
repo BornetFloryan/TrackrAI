@@ -1,5 +1,5 @@
-import { defineStore } from 'pinia';
-import sessionService from '../services/session.service';
+import { defineStore } from 'pinia'
+import sessionService from '../services/session.service'
 
 export const useSessionStore = defineStore('session', {
   state: () => ({
@@ -11,72 +11,62 @@ export const useSessionStore = defineStore('session', {
 
   actions: {
     async start(moduleKey) {
-      this.loading = true;
-      this.error = null;
+      this.loading = true
+      this.error = null
 
       try {
-        const res = await sessionService.start(moduleKey);
-        this.sessionId = res.sessionId;
-        this.moduleKey = moduleKey;
-        return this.sessionId;
+        const res = await sessionService.start(moduleKey)
+        this.sessionId = res.sessionId
+        this.moduleKey = moduleKey
+        return res.sessionId
       } catch (err) {
-        this.error = err.response?.data || err.message;
-        throw err;
+        this.error = err.response?.data || err.message
+        throw err
       } finally {
-        this.loading = false;
+        this.loading = false
       }
     },
 
     async stop() {
-      if (!this.moduleKey || !this.sessionId) return;
+      if (!this.moduleKey) return
 
-      this.loading = true;
-      this.error = null;
+      this.loading = true
+      this.error = null
 
       try {
-        await sessionService.stop(this.moduleKey);
-        this.sessionId = null;
-        this.moduleKey = null;
+        await sessionService.stop(this.moduleKey)
       } catch (err) {
-        this.error = err.response?.data || err.message;
-        throw err;
+        // idempotent → on ignore
       } finally {
-        this.loading = false;
+        this.sessionId = null
+        this.moduleKey = null
+        this.loading = false
       }
     },
 
     async syncActiveForModule(moduleKey) {
-      this.loading = true;
-      this.error = null;
+      const res = await sessionService.activeForModule(moduleKey)
+      const payload = res
+      console.log('syncActiveForModule', moduleKey, payload)
 
-      try {
-        const res = await sessionService.activeForModule(moduleKey);
-        const payload = res.data.data;
-
-        if (payload?.active) {
-          this.sessionId = payload.sessionId;
-          this.moduleKey = moduleKey;
-        } else {
-          this.sessionId = null;
-          this.moduleKey = null;
-        }
-
-        return payload;
-      } catch (err) {
-        this.error = err.response?.data || err.message;
-        throw err;
-      } finally {
-        this.loading = false;
+      if (payload?.active) {
+        this.sessionId = payload.sessionId
+        this.moduleKey = moduleKey
+      } else {
+        this.sessionId = null
+        this.moduleKey = null
       }
+
+      return payload
     },
+
     async fetchHistory() {
       this.loading = true
       try {
-      return await sessionService.history()
+        return await sessionService.history()
       } finally {
         this.loading = false
       }
-    }
-    
-  }
-});
+    },
+  },
+})

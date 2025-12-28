@@ -303,10 +303,53 @@ const getModules = async function (req, res, next) {
   res.status(200).send(answer);
 };
 
+/**
+ * update module connection status
+ * @param {Object} req - The request object (provided by express)
+ * @param {Object} req.body - The data payload sent with the request
+ * @param {string} req.body.moduleKey
+ * @param {boolean} req.body.connected
+ * @param {Object} res - The result object used to send the result to the client (provided by express)
+ * @param {Function} next - The next middleware to call after this one
+ */
+const connection = async function (req, res, next) {
+  answer.reset()
+
+  const { moduleKey, connected } = req.body
+  if (!moduleKey || typeof connected !== 'boolean') {
+    answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_KEY_NOT_DEFINED))
+    return next(answer)
+  }
+
+  try {
+    const mod = await Module.findOneAndUpdate(
+      { key: moduleKey },
+      {
+        connected,
+        lastSeen: new Date()
+      },
+      { new: true }
+    )
+
+    if (!mod) {
+      answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_MODULE_KEY))
+      return next(answer)
+    }
+
+    answer.data = mod
+    return res.status(200).send(answer)
+  } catch (err) {
+    answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_FIND_MODULE_REQUEST))
+    return next(answer)
+  }
+}
+
+
 
 module.exports = {
   create,
   update,
   register,
   getModules,
+  connection,
 }

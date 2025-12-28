@@ -9,9 +9,10 @@
         <option disabled value="">
           {{ moduleStoreLoading ? 'Chargement...' : 'Sélectionner un module' }}
         </option>
-        <option v-for="m in modules" :key="m._id" :value="m.key">
-          {{ m.name }} ({{ m.uc }})
+        <option v-for="m in modules" :key="m._id" :value="m.key" :disabled="!m.connected">
+          {{ m.name }} ({{ m.uc }}) {{ m.connected ? '🟢' : '⚪' }}
         </option>
+
       </select>
 
       <div style="display:flex; gap:.5rem; margin-top:.75rem; flex-wrap:wrap;">
@@ -58,6 +59,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { watch } from 'vue'
 
 import { useModuleStore } from '../store/module.store'
 import { useSessionStore } from '../store/session.store'
@@ -98,11 +100,15 @@ const stressValue = ref(null)
 let poller = null
 let timer = null
 let startedAt = null
+let modulePoller = null
+let sessionPoller = null
 
 onMounted(async () => {
   moduleStoreLoading.value = true
   try {
     await moduleStore.fetch()
+    autoSelectConnectedModule()
+    startModulePolling()
   } catch (e) {
     errorMsg.value = 'Impossible de charger les modules'
   } finally {
@@ -117,6 +123,7 @@ async function startSession() {
     startedAt = Date.now()
     startTimer()
     startPolling()
+    startSessionPolling()
   } catch (e) {
     errorMsg.value = sessionStore.error?.data || sessionStore.error?.message || 'Erreur démarrage session'
   }
@@ -131,6 +138,7 @@ async function stopSession() {
   } finally {
     stopPolling()
     stopTimer()
+    stopSessionPolling()
   }
 }
 
@@ -212,6 +220,51 @@ function stopPolling() {
   poller = null
 }
 
+function startModulePolling() {
+  stopModulePolling()
+  modulePoller = setInterval(async () => {
+    await moduleStore.fetch({ silent: true })
+    autoSelectConnectedModule()
+  }, 2000)
+}
+
+function stopModulePolling() {
+  if (typeof modulePoller !== 'undefined' && modulePoller) {
+    clearInterval(modulePoller)
+    modulePoller = null
+  }
+}
+
+function autoSelectConnectedModule() {
+  if (sessionStore.sessionId) return
+
+  const current = modules.value.find(m => m.key === moduleKey.value)
+  if (!moduleKey.value || (current && !current.connected)) {
+    const active = modules.value.find(m => m.connected)
+    moduleKey.value = active ? active.key : ''
+  }
+}
+
+function startSessionPolling() {
+  stopSessionPolling()
+  sessionPoller = setInterval(async () => {
+    if (!moduleKey.value || !sessionStore.sessionId) return
+
+    const res = await sessionStore.syncActiveForModule(moduleKey.value)
+    if (!res?.active) {
+      errorMsg.value = 'Session stoppée automatiquement (module inactif)'
+      stopPolling()
+      stopTimer()
+    }
+  }, 2000)
+}
+
+function stopSessionPolling() {
+  if (sessionPoller) clearInterval(sessionPoller)
+  sessionPoller = null
+}
+
+
 /* =========================
    TIMER
 ========================= */
@@ -228,8 +281,10 @@ function stopTimer() {
 }
 
 onBeforeUnmount(() => {
+  stopModulePolling()
   stopPolling()
   stopTimer()
+  stopSessionPolling()
 })
 
 /* =========================
@@ -283,4 +338,21 @@ const headingSub = computed(() => {
   if (headingDeg.value == null) return 'Direction: immobile / GPS insuffisant'
   return 'Direction de déplacement (GPS)'
 })
+
+watch(
+  () => modules.value,
+  (mods) => {
+    if (!sessionStore.sessionId) return
+
+    const current = mods.find(m => m.key === moduleKey.value)
+    if (current && !current.connected) {
+      errorMsg.value = 'Module déconnecté — session arrêtée'
+      sessionStore.sessionId = null
+      stopPolling()
+      stopTimer()
+    }
+
+  },
+  { deep: true }
+)
 </script>
