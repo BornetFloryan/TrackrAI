@@ -5,273 +5,338 @@ import java.util.List;
 
 class ThreadServer extends Thread {
 
-	BufferedReader br;
-	PrintStream ps;
-	Socket sock;
-	DataExchanger exchanger;
-	int idThread;
+    private static final int SOCKET_TIMEOUT_MS = 15000;
 
-	// === SESSION STATE ===
-	boolean sessionActive = false;
-	String currentSessionId = null;
+    BufferedReader br;
+    PrintStream ps;
+    Socket sock;
+    DataExchanger exchanger;
+    int idThread;
 
-	String moduleKey = null;
+    // === SESSION STATE ===
+    boolean sessionActive = false;
+    String currentSessionId = null;
 
-	public ThreadServer(int idThread, Socket sock, DataExchanger data) {
-		this.sock = sock;
-		this.idThread = idThread;
-		this.exchanger = data;
-	}
+    String moduleKey = null;
 
-	public void run() {
 
-		try {
-			br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
-			ps = new PrintStream(sock.getOutputStream());
+    public ThreadServer(int idThread, Socket sock, DataExchanger data) {
+        this.sock = sock;
+        this.idThread = idThread;
+        this.exchanger = data;
+    }
+
+    public void run() {
+
+        try {
+            sock.setSoTimeout(SOCKET_TIMEOUT_MS);
+
+            br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+            ps = new PrintStream(sock.getOutputStream());
+        } catch (IOException e) {
+            System.err.println("Thread " + idThread + ": cannot create streams. Aborting.");
+            return;
+        }
+
+        requestLoop();
+        System.out.println("end of thread " + idThread);
+    }
+
+	private void cleanup() {
+		System.out.println("Thread " + idThread + " cleanup");
+
+		if (moduleKey != null) {
+			MainServer.modules.remove(moduleKey);
+
+			try {
+				exchanger.getHttpDriver().moduleConnection(moduleKey, false);
+			} catch (Exception e) {
+				System.err.println("Failed to update module connection=false on API");
+			}
+
+			System.out.println("Module disconnected: " + moduleKey);
 		}
-		catch(IOException e) {
-			System.err.println("Thread "+ idThread +": cannot create streams. Aborting.");
-			return;
-		}
 
-		requestLoop();
-		System.out.println("end of thread "+ idThread);
+		sessionActive = false;
+		currentSessionId = null;
+
+		try { sock.close(); } catch (Exception ignored) {}
 	}
 
 	public void requestLoop() {
 
-		String req = "";
+		String req;
 		String idReq;
 		String[] reqParts;
 
 		try {
-			while(true) {
-				req = br.readLine();
-				if ((req == null) || (req.isEmpty())) {
+			while (true) {
+
+				try {
+					req = br.readLine();
+				}
+				catch (SocketTimeoutException te) {
+
+					if (sessionActive) {
+						System.out.println(
+								"Thread " + idThread +
+										" -> socket timeout during ACTIVE session, closing connection"
+						);
+						break;
+					}
+
+					// pas de session → on continue à attendre
+					continue;
+				}
+
+				if (req == null) {
+					System.out.println("Thread " + idThread + " -> socket closed by client");
 					break;
+				}
+
+				if (req.isEmpty()) {
+					continue;
 				}
 
 				reqParts = req.split(" ");
 				idReq = reqParts[0];
 
-				if ("AUTOREGISTER".equals(idReq)) {
-					requestAutoRegister(reqParts);
-				}
-				else if ("STOREMEASURE".equals(idReq)) {
-					requestStoreMeasure(reqParts);
-				}
-				else if ("STOREANALYSIS".equals(idReq)) {
-					requestStoreAnalysis(reqParts);
-				}
-				else if ("START_SESSION".equals(idReq)) {
-					requestStartSession(reqParts);
-				}
-				else if ("STOP_SESSION".equals(idReq)) {
-					requestStopSession();
-				}
-				else if ("HELLO".equals(idReq)) {
-					requestHello(reqParts);
-				}
-				else if ("START_SESSION_FOR_MODULE".equals(idReq)) {
-					requestStartSessionForModule(reqParts);
-				}
-				else if ("STOP_SESSION_FOR_MODULE".equals(idReq)) {
-					requestStopSessionForModule(reqParts);
-				}
-				else {
-					ps.println("ERR unknown command");
+				switch (idReq) {
+					case "AUTOREGISTER" -> requestAutoRegister(reqParts);
+					case "STOREMEASURE" -> requestStoreMeasure(reqParts);
+					case "STOREANALYSIS" -> requestStoreAnalysis(reqParts);
+					case "START_SESSION" -> requestStartSession(reqParts);
+					case "STOP_SESSION" -> requestStopSession();
+					case "HELLO" -> requestHello(reqParts);
+					case "START_SESSION_FOR_MODULE" -> requestStartSessionForModule(reqParts);
+					case "STOP_SESSION_FOR_MODULE" -> requestStopSessionForModule(reqParts);
+					case "FORCE_DISCONNECT_MODULE" -> requestForceDisconnect(reqParts);
+					default -> ps.println("ERR unknown command");
 				}
 			}
-			System.out.println("end of request loop");
 		}
-		catch(IOException e) {
-			System.out.println("problem with receiving request: "+e.getMessage());
+		catch (IOException e) {
+			System.out.println("problem with receiving request: " + e.getMessage());
 		}
 		finally {
-			sessionActive = false;
-			currentSessionId = null;
+			cleanup();
 		}
 	}
 
-	protected void requestAutoRegister(String[] params) throws IOException {
+    public void forceDisconnect(String reason) {
+        System.out.println("Force disconnect thread " + idThread + ": " + reason);
+        try {
+            sock.close();
+        } catch (Exception ignored) {
+        }
+    }
 
-		// remove the identifier+uc from params
-		List<String> lst = new ArrayList<>();
-		for(int i=2;i<params.length;i++) {
-			lst.add(params[i]);
-		}
+    protected void requestAutoRegister(String[] params) throws IOException {
 
-		System.out.println("processing request AUTO REGISTER");
+        // remove the identifier+uc from params
+        List<String> lst = new ArrayList<>();
+        for (int i = 2; i < params.length; i++) {
+            lst.add(params[i]);
+        }
 
-		if (params.length < 3) {
-			ps.println("ERR invalid number of parameters");
-			return;
-		}
+        System.out.println("processing request AUTO REGISTER");
 
-		// (un)comment to choose direct mongo access or through the node API
-		// String answer = exchanger.getMongoDriver().autoRegisterModule(params[1], lst);
-		String answer = exchanger.getHttpDriver().autoRegisterModule(params[1], lst);
+        if (params.length < 3) {
+            ps.println("ERR invalid number of parameters");
+            return;
+        }
 
-		System.out.println(answer);
-		ps.println(answer);
-	}
+        // (un)comment to choose direct mongo access or through the node API
+        // String answer = exchanger.getMongoDriver().autoRegisterModule(params[1], lst);
+        String answer = exchanger.getHttpDriver().autoRegisterModule(params[1], lst);
 
-	protected void requestStoreMeasure(String[] params) throws IOException {
+        System.out.println(answer);
+        ps.println(answer);
+    }
 
-		if (!sessionActive || currentSessionId == null) {
-			ps.println("ERR no active session");
-			return;
-		}
+    protected void requestStoreMeasure(String[] params) throws IOException {
 
-		if (params.length != 5) {
-			ps.println("ERR invalid number of parameters");
-			return;
-		}
+        if (!sessionActive || currentSessionId == null) {
+            ps.println("ERR no active session");
+            return;
+        }
 
-		System.out.println(
-				"processing STOREMEASURE in session " + currentSessionId
-		);
+        if (params.length != 5) {
+            ps.println("ERR invalid number of parameters");
+            return;
+        }
 
-		// (un)comment to choose direct mongo access or through the node API
-		// String answer = exchanger.getMongoDriver().saveMeasure(params[1], params[2], params[3], params[4]);
-		String answer = exchanger.getHttpDriver()
-				.saveMeasure(params[1], params[2], params[3], params[4], currentSessionId);
+        System.out.println(
+                "processing STOREMEASURE in session " + currentSessionId
+        );
 
-		System.out.println(answer);
-		ps.println(answer);
-	}
+        // (un)comment to choose direct mongo access or through the node API
+        // String answer = exchanger.getMongoDriver().saveMeasure(params[1], params[2], params[3], params[4]);
+        String answer = exchanger.getHttpDriver()
+                .saveMeasure(params[1], params[2], params[3], params[4], currentSessionId);
 
-	protected void requestStoreAnalysis(String[] params) throws IOException {
+        System.out.println(answer);
+        ps.println(answer);
+    }
 
-		System.out.println("processing request STORE ANALYSIS");
+    protected void requestStoreAnalysis(String[] params) throws IOException {
 
-		if (params.length != 4) {
-			ps.println("ERR invalid number of parameters");
-			return;
-		}
+        System.out.println("processing request STORE ANALYSIS");
 
-		// (un)comment to choose direct mongo access or through the node API
-		String answer = exchanger.getMongoDriver().saveAnalysis(params[1], params[2], params[3]);
-		// String answer = exchanger.getHttpDriver().saveAnalysis(params[1], params[2], params[3]);
+        if (params.length != 4) {
+            ps.println("ERR invalid number of parameters");
+            return;
+        }
 
-		System.out.println(answer);
-		ps.println(answer);
-	}
+        // (un)comment to choose direct mongo access or through the node API
+        String answer = exchanger.getMongoDriver().saveAnalysis(params[1], params[2], params[3]);
+        // String answer = exchanger.getHttpDriver().saveAnalysis(params[1], params[2], params[3]);
 
-	protected void requestStartSession(String[] params) throws IOException {
+        System.out.println(answer);
+        ps.println(answer);
+    }
 
-		if (params.length != 2) {
-			ps.println("ERR invalid parameters");
-			return;
-		}
+    protected void requestStartSession(String[] params) throws IOException {
 
-		// refuse if already active
-		if (sessionActive) {
-			ps.println("ERR session already active");
-			return;
-		}
+        if (params.length != 2) {
+            ps.println("ERR invalid parameters");
+            return;
+        }
 
-		String sessionId = params[1];
+        // refuse if already active
+        if (sessionActive) {
+            ps.println("ERR session already active");
+            return;
+        }
 
-		// validate session with API
-		boolean ok = exchanger.getHttpDriver().isSessionActive(sessionId);
-		if (!ok) {
-			ps.println("ERR invalid or inactive session");
-			return;
-		}
+        String sessionId = params[1];
 
-		currentSessionId = sessionId;
-		sessionActive = true;
+        // validate session with API
+        boolean ok = exchanger.getHttpDriver().isSessionActive(sessionId);
+        if (!ok) {
+            ps.println("ERR invalid or inactive session");
+            return;
+        }
 
-		System.out.println(
-				"Thread " + idThread + " -> session started: " + currentSessionId
-		);
+        currentSessionId = sessionId;
+        sessionActive = true;
 
-		ps.println("OK");
-	}
+        System.out.println(
+                "Thread " + idThread + " -> session started: " + currentSessionId
+        );
 
-	protected void requestStopSession() throws IOException {
+        ps.println("OK");
+    }
 
-		// idempotent: OK even if already stopped
-		sessionActive = false;
-		currentSessionId = null;
+    protected void requestStopSession() throws IOException {
 
-		System.out.println(
-				"Thread " + idThread + " -> session stopped"
-		);
+        // idempotent: OK even if already stopped
+        sessionActive = false;
+        currentSessionId = null;
 
-		ps.println("OK");
-	}
+        System.out.println(
+                "Thread " + idThread + " -> session stopped"
+        );
 
-	protected void requestHello(String[] params) throws IOException {
+        ps.println("OK");
+    }
 
-		if (params.length != 2) {
-			ps.println("ERR invalid parameters");
-			return;
-		}
+    protected void requestHello(String[] params) throws IOException {
 
-		moduleKey = params[1];
+        if (params.length != 2) {
+            ps.println("ERR invalid parameters");
+            return;
+        }
 
-		MainServer.modules.put(moduleKey, this);
+        moduleKey = params[1];
 
-		System.out.println(
-				"Thread " + idThread + " -> HELLO from module " + moduleKey
-		);
+        ThreadServer previous = MainServer.modules.get(moduleKey);
+        if (previous != null && previous != this) {
+            System.out.println("Replacing existing connection for module " + moduleKey);
+            previous.forceDisconnect("Replaced by new connection");
+        }
 
-		ps.println("OK");
-	}
+        MainServer.modules.put(moduleKey, this);
 
-	protected void requestStartSessionForModule(String[] params) throws IOException {
-		if (params.length != 3) {
-			ps.println("ERR invalid parameters");
-			return;
-		}
+        System.out.println(
+                "Thread " + idThread + " -> HELLO from module " + moduleKey
+        );
 
-		String targetModuleKey = params[1];
-		String sessionId = params[2];
+        exchanger.getHttpDriver().moduleConnection(moduleKey, true);
 
-		ThreadServer target = MainServer.modules.get(targetModuleKey);
-		if (target == null) {
-			ps.println("ERR module not connected");
-			return;
-		}
+        ps.println("OK");
+    }
 
-		boolean ok = exchanger.getHttpDriver().isSessionActive(sessionId);
-		if (!ok) {
-			ps.println("ERR invalid or inactive session");
-			return;
-		}
+    protected void requestStartSessionForModule(String[] params) throws IOException {
+        if (params.length != 3) {
+            ps.println("ERR invalid parameters");
+            return;
+        }
 
-		target.currentSessionId = sessionId;
-		target.sessionActive = true;
+        String targetModuleKey = params[1];
+        String sessionId = params[2];
 
-		target.ps.println("START_SESSION " + sessionId);
-		target.ps.flush();
+        ThreadServer target = MainServer.modules.get(targetModuleKey);
+        if (target == null) {
+            ps.println("ERR module not connected");
+            return;
+        }
 
-		ps.println("OK");
-	}
+        boolean ok = exchanger.getHttpDriver().isSessionActive(sessionId);
+        if (!ok) {
+            ps.println("ERR invalid or inactive session");
+            return;
+        }
 
-	protected void requestStopSessionForModule(String[] params) throws IOException {
+        target.currentSessionId = sessionId;
+        target.sessionActive = true;
 
-		if (params.length != 2) {
-			ps.println("ERR invalid parameters");
-			return;
-		}
+        target.ps.println("START_SESSION " + sessionId);
+        target.ps.flush();
 
-		String targetModuleKey = params[1];
+        ps.println("OK");
+    }
 
-		ThreadServer target = MainServer.modules.get(targetModuleKey);
-		if (target == null) {
-			ps.println("ERR module not connected");
-			return;
-		}
+    protected void requestStopSessionForModule(String[] params) throws IOException {
 
-		target.sessionActive = false;
-		target.currentSessionId = null;
+        if (params.length != 2) {
+            ps.println("ERR invalid parameters");
+            return;
+        }
 
-		target.ps.println("STOP_SESSION");
-		target.ps.flush();
+        String targetModuleKey = params[1];
 
-		ps.println("OK");
-	}
+        ThreadServer target = MainServer.modules.get(targetModuleKey);
+        if (target == null) {
+            ps.println("ERR module not connected");
+            return;
+        }
+
+        target.sessionActive = false;
+        target.currentSessionId = null;
+
+        target.ps.println("STOP_SESSION");
+        target.ps.flush();
+
+        ps.println("OK");
+    }
+
+    protected void requestForceDisconnect(String[] params) throws IOException {
+        if (params.length != 2) {
+            ps.println("ERR invalid parameters");
+            return;
+        }
+
+        String targetModuleKey = params[1];
+        ThreadServer target = MainServer.modules.get(targetModuleKey);
+
+        if (target == null) {
+            ps.println("OK"); // déjà déconnecté → idempotent
+            return;
+        }
+
+        target.forceDisconnect("Forced by API watchdog");
+        ps.println("OK");
+    }
+
 }

@@ -141,4 +141,9 @@ public class MongoDataDriver implements DataDriver {
         // Mongo driver does NOT handle sessions
         return true;
     }
+
+    public void moduleConnection(String moduleKey, boolean connected) {
+        // Mongo driver does NOT handle sessions
+    }
+
 }

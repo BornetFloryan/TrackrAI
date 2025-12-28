@@ -114,4 +114,11 @@ public class HttpDataDriver implements DataDriver {
         if (doc == null) return false;
         return doc.getInteger("error") == 0;
     }
+
+    public void moduleConnection(String moduleKey, boolean connected) {
+        String payload =
+                "{ \"moduleKey\": \"" + moduleKey + "\", \"connected\": " + connected + " }";
+        postRequest("/module/connection", payload);
+    }
+
 }
