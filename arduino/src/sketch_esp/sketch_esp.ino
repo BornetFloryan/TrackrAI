@@ -50,9 +50,6 @@ bool recording = false;
 
 /* Cardio */
 uint16_t heartRate = 0;
-float rr_ms[64];
-int rrCount = 0;
-float rmssd = NAN;
 
 /* ================= CONFIG DYNAMIQUE ================= */
 char server_host[64] = "82.64.26.75";
@@ -63,15 +60,32 @@ unsigned long lastSend = 0;
 const unsigned long SEND_INTERVAL = 1000;
 
 /* ================= HRV ================= */
+static const int RR_BUF_SIZE = 64;
+
+float rr_ms[RR_BUF_SIZE];
+int rrCount = 0;
+int rrIndex = 0;
+
+float rmssd = NAN;
+volatile bool rmssdDirty = false;
+
 void addRR(float v) {
-  if (rrCount < 64) rr_ms[rrCount++] = v;
+  rr_ms[rrIndex] = v;
+  rrIndex = (rrIndex + 1) % RR_BUF_SIZE;
+  if (rrCount < RR_BUF_SIZE) rrCount++;
+  rmssdDirty = true;
 }
 
 float computeRMSSD() {
   if (rrCount < 3) return NAN;
+
   float s = 0;
+  int start = (rrIndex - rrCount + RR_BUF_SIZE) % RR_BUF_SIZE;
+
   for (int i = 1; i < rrCount; i++) {
-    float d = rr_ms[i] - rr_ms[i - 1];
+    float a = rr_ms[(start + i - 1) % RR_BUF_SIZE];
+    float b = rr_ms[(start + i) % RR_BUF_SIZE];
+    float d = b - a;
     s += d * d;
   }
   return sqrt(s / (rrCount - 1));
@@ -95,10 +109,9 @@ void hrNotifyCallback(
   if (rrPresent) {
     while (offset + 1 < len) {
       uint16_t rr1024 = data[offset] | (data[offset + 1] << 8);
-      addRR((rr1024 * 1000.0) / 1024.0);
+      addRR((rr1024 * 1000.0f) / 1024.0f);
       offset += 2;
     }
-    rmssd = computeRMSSD();
   }
 }
 
@@ -338,7 +351,15 @@ void loop() {
 
   // 6) HEART
   sendMeasure("heart_rate", heartRate);
-  if (!isnan(rmssd)) sendMeasure("rmssd", rmssd);
+
+  if (rmssdDirty) {
+    rmssd = computeRMSSD();
+    rmssdDirty = false;
+
+    if (!isnan(rmssd)) {
+      sendMeasure("rmssd", rmssd);
+    }
+  }
 
   // 7) IMU
   int16_t ax, ay, az, gx, gy, gz;
