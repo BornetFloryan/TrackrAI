@@ -25,10 +25,6 @@
 
         <p v-if="error" style="color:var(--danger); margin:0;">{{ error }}</p>
       </form>
-
-      <p style="color:var(--muted); margin:.75rem 0 0 0; font-size:.9rem;">
-        L’API utilise <code>x-session-id</code> (token de session).
-      </p>
     </div>
   </div>
 </template>

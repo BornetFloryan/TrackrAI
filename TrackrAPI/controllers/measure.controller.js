@@ -82,7 +82,6 @@ function checkData(data) {
 const create = async function (req, res, next) {
   answer.reset();
 
-  // sanity check on parameters
   if (
     !checkType(req.body.type) ||
     !checkDate(req.body.date) ||
@@ -91,34 +90,29 @@ const create = async function (req, res, next) {
     return next(answer);
   }
 
-  // sessionId is mandatory
-  let sessionId = req.body.sessionId;
+  const sessionId = req.body.sessionId;
   if (!sessionId) {
-    answer.set(
-      SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST)
-    );
-    return next(answer);
+    answer.setPayload({ ignored: true });
+    return res.status(200).send(answer);
   }
 
-  // check if session exists and is active
   let session;
   try {
     session = await Session.findOne({
-      sessionId: sessionId,
+      sessionId,
       endDate: { $exists: false },
     }).exec();
 
-    if (session === null) {
-      answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
-      return next(answer);
+    if (!session) {
+      answer.setPayload({ ignored: true });
+      return res.status(200).send(answer);
     }
-  } catch (err) {
-    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_FOUND));
-    return next(answer);
+  } catch (_) {
+    answer.setPayload({ ignored: true });
+    return res.status(200).send(answer);
   }
 
-  // build measure object
-  let m = {
+  const m = {
     type: req.body.type,
     date: req.body.date,
     value: req.body.value,
@@ -131,7 +125,6 @@ const create = async function (req, res, next) {
       answer.set(
         MeasureErrors.getError(MeasureErrors.ERR_MEASURE_INVALID_CREATE_REQUEST)
       );
-      answer.data = answer.data + "\n" + err;
       return next(answer);
     }
 
