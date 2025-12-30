@@ -252,7 +252,7 @@ function startSessionPolling() {
 
     const res = await sessionStore.syncActiveForModule(moduleKey.value)
     if (!res?.active) {
-      errorMsg.value = 'Session stoppée automatiquement (module inactif)'
+      //errorMsg.value = 'Session stoppée automatiquement (module inactif)'
       stopPolling()
       stopTimer()
     }

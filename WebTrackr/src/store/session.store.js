@@ -47,7 +47,6 @@ export const useSessionStore = defineStore('session', {
     async syncActiveForModule(moduleKey) {
       const res = await sessionService.activeForModule(moduleKey)
       const payload = res
-      console.log('syncActiveForModule', moduleKey, payload)
 
       if (payload?.active) {
         this.sessionId = payload.sessionId
