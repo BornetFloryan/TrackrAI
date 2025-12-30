@@ -49,11 +49,11 @@ export function groupSessionsFromMeasures(measures) {
     const rmssd = lastOf(list, 'rmssd')
     const stress = estimateStress({ rmssd, hr: hrAvg })
 
-    const moduleId = list[0].module || null
+    const moduleKey = list[0].module ?? null
 
     sessions.push({
       sessionMongoId,
-      moduleId,
+      moduleKey,
       start,
       end,
       durationMs,
@@ -64,6 +64,7 @@ export function groupSessionsFromMeasures(measures) {
       speedMaxMs: speedMax,
       steps,
       stress,
+      gpsTrack: gpsPts,
     })
   }
 

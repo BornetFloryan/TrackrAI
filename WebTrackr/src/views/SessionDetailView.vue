@@ -12,8 +12,8 @@
       </div>
 
       <div class="grid grid-2" style="margin-top:1rem;">
-        <MeasureChart title="Fréquence cardiaque" unit="bpm" :series="hrSeries" />
-        <MeasureChart title="Vitesse" unit="km/h" :series="speedSeriesKmH" />
+        <MeasureChart title="Fréquence cardiaque" type="heart_rate" unit="bpm" :series="hrSeries" />
+        <MeasureChart title="Vitesse" type="gps_speed" unit="km/h" :series="speedSeriesKmH" />
       </div>
 
       <div class="card" style="margin-top:1rem;">
@@ -26,8 +26,10 @@
         <p style="color:var(--muted); margin:0 0 .75rem 0;">
           Nombre de mesures : {{ measures.length }}
         </p>
-        <div style="max-height:320px; overflow:auto; border:1px solid var(--border); border-radius:12px; padding:.6rem;">
-          <div v-for="m in measures.slice().reverse().slice(0, 200)" :key="m._id" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.85rem; color:rgba(231,238,252,.85)">
+        <div
+          style="max-height:320px; overflow:auto; border:1px solid var(--border); border-radius:12px; padding:.6rem;">
+          <div v-for="m in measures.slice().reverse().slice(0, 200)" :key="m._id"
+            style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.85rem; color:rgba(231,238,252,.85)">
             {{ new Date(m.date).toLocaleTimeString() }} • {{ m.type }} = {{ m.value }}
           </div>
         </div>
@@ -65,7 +67,7 @@ onMounted(async () => {
     const after = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
     const all = await measureStore.fetch(null, after, null)
     measures.value = all.filter(m => String(m.session) === String(props.sessionMongoId))
-    measures.value.sort((a,b)=> new Date(a.date) - new Date(b.date))
+    measures.value.sort((a, b) => new Date(a.date) - new Date(b.date))
 
     const track = buildGpsTrack(measures.value)
     gpsPoints.value = track.map(p => [p.lat, p.lon])
@@ -90,7 +92,7 @@ const durationLabel = computed(() => {
 const distanceKm = computed(() => {
   if (gpsPoints.value.length < 2) return 0
   let d = 0
-  for (let i=1;i<gpsPoints.value.length;i++) d += haversineKm(gpsPoints.value[i-1], gpsPoints.value[i])
+  for (let i = 1; i < gpsPoints.value.length; i++) d += haversineKm(gpsPoints.value[i - 1], gpsPoints.value[i])
   return d
 })
 const distanceLabel = computed(() => `${distanceKm.value.toFixed(2)} km`)
@@ -103,9 +105,9 @@ const speedSeriesKmH = computed(() =>
 )
 
 const speedLabel = computed(() => {
-  const arr = speedSeriesKmH.value.map(x=>x.value)
+  const arr = speedSeriesKmH.value.map(x => x.value)
   if (!arr.length) return 'Vitesse: —'
-  const avg = arr.reduce((a,b)=>a+b,0)/arr.length
+  const avg = arr.reduce((a, b) => a + b, 0) / arr.length
   return `Vitesse moy.: ${avg.toFixed(1)} km/h`
 })
 
@@ -117,10 +119,10 @@ const steps = computed(() => {
 })
 
 const stress = computed(() => {
-  const hrAvg = hrSeries.value.length ? hrSeries.value.reduce((a,b)=>a + (b.value>0?b.value:0),0) / Math.max(1, hrSeries.value.filter(x=>x.value>0).length) : null
+  const hrAvg = hrSeries.value.length ? hrSeries.value.reduce((a, b) => a + (b.value > 0 ? b.value : 0), 0) / Math.max(1, hrSeries.value.filter(x => x.value > 0).length) : null
   // rmssd dernier
   let rmssd = null
-  for (let i=measures.value.length-1;i>=0;i--){
+  for (let i = measures.value.length - 1; i >= 0; i--) {
     if (measures.value[i].type === 'rmssd') {
       const n = Number(measures.value[i].value); if (Number.isFinite(n)) rmssd = n
       break

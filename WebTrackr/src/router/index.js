@@ -19,7 +19,7 @@ const routes = [
 
   { path: '/sessions', component: HistoriqueView, meta: { requiresAuth: true } },
 
-  { path: '/sessions/:sessionMongoId', component: SessionDetailView, props: true, meta: { requiresAuth: true } },
+  { path: '/sessions/:sessionMongoId', name: 'session-detail',  component: SessionDetailView, props: true, meta: { requiresAuth: true } },
 
   { path: '/coach', component: CoachView, meta: { requiresAuth: true, requiresCoach: true } },
 

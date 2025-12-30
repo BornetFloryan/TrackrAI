@@ -204,4 +204,31 @@ const activeForModule = async (req, res) => {
   return res.status(200).send(answer);
 };
 
-module.exports = { start, stop, active, activeForModule };
+/**
+ * HISTORIQUE
+ */
+const history = async (req, res, next) => {
+  answer.reset()
+
+  if (!req.user) {
+    answer.set(SessionErrors.getError(SessionErrors.ERR_SESSION_NOT_AUTHORIZED))
+    return next(answer)
+  }
+
+  const { _id, rights } = req.user
+  const filter = rights.includes('admin') || rights.includes('coach')
+    ? {}
+    : { user: _id }
+
+  const sessions = await Session.find(filter)
+    .populate('module', 'name uc key')
+    .populate('user', 'login')
+    .sort({ startDate: -1 })
+    .lean()
+    .exec()
+
+  answer.setPayload(sessions)
+  return res.status(200).send(answer)
+}
+
+module.exports = { start, stop, active, activeForModule, history };
