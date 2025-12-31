@@ -12,7 +12,7 @@ from protocol.messages import (
     make_result,
 )
 from protocol.errors import ERR_BAD_MESSAGE, ERR_INTERNAL
-from io.video_receiver import VideoReceiveSession
+from stream_io.video_receiver import VideoReceiveSession
 from analysis.analyzer_registry import analyze_video_for_exercise
 from central.central_tcp_client import send_analysis_to_central
 

@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from io.temp_storage import make_temp_mp4, safe_remove
+from stream_io.temp_storage import make_temp_mp4, safe_remove
 
 
 @dataclass
