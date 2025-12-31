@@ -1,66 +1,62 @@
 <template>
   <div class="page">
-    <h1>Vidéo (mobile)</h1>
+    <h1>Analyse vidéo</h1>
 
-    <div class="card">
-      <p style="margin:0; color:var(--muted)">
-        Page prête pour envoyer une courte vidéo vers ton futur serveur MediaPipe.
-        Pour l’instant : capture/preview + upload “stub”.
-      </p>
-    </div>
+    <input type="file" accept="video/*" @change="onFile" />
 
-    <div class="card" style="margin-top:1rem;">
-      <h3 style="margin:0 0 .6rem 0;">Capture</h3>
+    <button @click="sendVideo" :disabled="loading">
+      {{ loading ? 'Analyse en cours…' : 'Analyser' }}
+    </button>
 
-      <input type="file" accept="video/*" capture="environment" @change="onPick" />
-
-      <div v-if="url" style="margin-top:1rem;">
-        <video :src="url" controls playsinline style="width:100%; border-radius:14px; border:1px solid var(--border)"></video>
-
-        <div style="display:flex; gap:.5rem; margin-top:.75rem; flex-wrap:wrap;">
-          <button @click="upload" :disabled="uploading">Envoyer (stub)</button>
-          <button class="secondary" @click="clear">Réinitialiser</button>
-        </div>
-
-        <p style="color:var(--muted)" v-if="uploadMsg">{{ uploadMsg }}</p>
-      </div>
+    <div v-if="result" class="card">
+      <h3>Score : {{ result.score }}</h3>
+      <ul>
+        <li v-for="e in result.errors" :key="e">❌ {{ e }}</li>
+       </ul>
+      <ul>
+        <li v-for="t in result.tips" :key="t">💡 {{ t }}</li>
+      </ul>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { AnalysisSocket } from '../services/analysis.ws'
 
-const file = ref(null)
-const url = ref('')
-const uploading = ref(false)
-const uploadMsg = ref('')
+const videoFile = ref(null)
+const result = ref(null)
+const loading = ref(false)
 
-function onPick(e) {
-  uploadMsg.value = ''
-  const f = e.target.files?.[0]
-  if (!f) return
-  file.value = f
-  url.value = URL.createObjectURL(f)
+function onFile(e) {
+  videoFile.value = e.target.files[0]
 }
 
-function clear() {
-  file.value = null
-  if (url.value) URL.revokeObjectURL(url.value)
-  url.value = ''
-  uploadMsg.value = ''
-}
+async function sendVideo() {
+  if (!videoFile.value) return
+  loading.value = true
+  result.value = null
 
-async function upload() {
-  if (!file.value) return
-  uploading.value = true
-  uploadMsg.value = ''
-  try {
-    // TODO futur: POST vers serveur mediapipe (multipart/form-data)
-    await new Promise(r => setTimeout(r, 500))
-    uploadMsg.value = '✅ Vidéo prête à être envoyée (endpoint MediaPipe à brancher).'
-  } finally {
-    uploading.value = false
+  const ws = new WebSocket(import.meta.env.VITE_ANALYZE_WS_URL)
+  await ws.waitOpen()
+
+  ws.sendJson({
+    type: 'START',
+    exercise: 'squat',
+    size: videoFile.value.size
+  })
+
+  const buffer = await videoFile.value.arrayBuffer()
+  ws.sendBinary(buffer)
+  ws.sendJson({ type: 'END' })
+
+  ws.ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data)
+    if (msg.type === 'RESULT') {
+      result.value = msg.analysis
+      loading.value = false
+      ws.close()
+    }
   }
 }
 </script>
