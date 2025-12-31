@@ -42,6 +42,8 @@ services:
     environment:
       - CENTRAL_HOST=trackr-central
       - CENTRAL_PORT=9000
+    ports:
+      - "6000:6000"
 
   frontend:
     build:

@@ -8,12 +8,20 @@ RUN apt-get update && apt-get install -y \
     libsm6 \
     libxext6 \
     libxrender-dev \
-    libportaudio2 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
+ENV WS_HOST=0.0.0.0
+ENV WS_PORT=6000
+ENV CENTRAL_HOST=trackr-central
+ENV CENTRAL_PORT=9000
+ENV CENTRAL_ENABLED=1
+ENV ANALYSIS_TYPE=SPORT
+
+EXPOSE 6000
 
 CMD ["python", "main.py"]

@@ -1,5 +1,8 @@
-from analysis_server import start_server
+import os
+from ws_server import run_ws_server
 
 if __name__ == "__main__":
-    print("Lancement du serveur d'analyse...")
-    start_server()
+    host = os.getenv("WS_HOST", "0.0.0.0")
+    port = int(os.getenv("WS_PORT", "6000"))
+    print(f"[AnalyzeServer] Starting WebSocket on {host}:{port}")
+    run_ws_server(host, port)
