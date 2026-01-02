@@ -55,7 +55,6 @@ async def handle_client(ws: WebSocketServerProtocol):
 
             # ---- start analysis ----
             if mtype == "START_ANALYSIS":
-                # close previous if any
                 if recv is not None:
                     recv.cleanup()
                     recv = None
@@ -115,7 +114,6 @@ async def handle_client(ws: WebSocketServerProtocol):
 
                 await ws.send(make_ack("ANALYSIS_STARTED", {"analysisId": recv.analysis_id, "exercise": recv.exercise}))
 
-                # analyze
                 try:
                     result = analyze_video_for_exercise(
                         exercise=recv.exercise,
@@ -131,15 +129,18 @@ async def handle_client(ws: WebSocketServerProtocol):
                     recv = None
                     continue
 
-                # send to client
                 await ws.send(make_result(result))
 
-                # forward to central
                 if central_enabled:
                     try:
-                        send_analysis_to_central(result)
+                        print("[AnalyzeServer] Forwarding analysis to central:", recv.analysis_id)
+                        resp = send_analysis_to_central(
+                            analysis_id=recv.analysis_id,
+                            payload=result
+                        )
+                        print("[AnalyzeServer] Central response:", resp)
                     except Exception as e:
-                        # don't fail user flow
+                        print("[AnalyzeServer][ERROR] Central forward failed:", e)
                         await ws.send(make_error("CENTRAL_FORWARD_FAILED", f"Central forward failed: {e}"))
 
                 recv.cleanup()
@@ -162,7 +163,6 @@ async def handle_client(ws: WebSocketServerProtocol):
 
 
 async def _main(host: str, port: int):
-    # max_size=None => allow big messages (we chunk anyway)
     async with websockets.serve(handle_client, host, port, max_size=None):
         print(f"[AnalyzeServer] WebSocket listening on {host}:{port}")
         await asyncio.Future()

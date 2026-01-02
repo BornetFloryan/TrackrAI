@@ -18,9 +18,10 @@ import {
   Chart as ChartJS,
   LineElement, PointElement,
   LinearScale, CategoryScale,
-  Tooltip, Legend
+  Tooltip, Legend,
+  Filler
 } from 'chart.js'
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend)
+ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend, Filler)
 
 const COLORS = {
   heart_rate: {

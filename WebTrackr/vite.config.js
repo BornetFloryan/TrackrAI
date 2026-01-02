@@ -10,7 +10,12 @@ export default defineConfig({
       '/trackrapi': {
         target: 'http://trackr-api:4567',
         changeOrigin: true
-      }
+      },
+      '/ws': {
+        target: 'ws://analyze:6000',
+        ws: true,
+        changeOrigin: true,
+      },
     }
   }
 })

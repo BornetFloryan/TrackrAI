@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+ENV PYTHONUNBUFFERED=1
 ENV WS_HOST=0.0.0.0
 ENV WS_PORT=6000
 ENV CENTRAL_HOST=trackr-central

@@ -112,6 +112,8 @@ const create = async function (req, res, next) {
     return res.status(200).send(answer);
   }
 
+  console.log("req.body", req.body);
+
   const m = {
     type: req.body.type,
     date: req.body.date,
@@ -119,6 +121,8 @@ const create = async function (req, res, next) {
     module: session.module,
     session: session._id,
   };
+
+  console.log("create measure", m);
 
   Measure.create(m, async function (err, measure) {
     if (err) {
@@ -266,8 +270,46 @@ const getMeasures = async function (req, res, next) {
   res.status(200).send(answer);
 };
 
+const getAnalysisById = async function (req, res, next) {
+  answer.reset();
+
+  const { analysisId } = req.params;
+  if (!analysisId) {
+    return res.status(400).send(answer);
+  }
+
+  let measure;
+  try {
+    measure = await Measure.findOne({ analysisId }).exec();
+  } catch (err) {
+    return next(answer);
+  }
+
+  if (!measure) {
+    return res.status(404).send(answer);
+  }
+
+  let parsed;
+  try {
+    const jsonStr = Buffer.from(measure.value, "base64").toString("utf-8");
+    parsed = JSON.parse(jsonStr);
+  } catch (e) {
+    parsed = null;
+  }
+
+  answer.data = {
+    analysisId: measure.analysisId,
+    type: measure.type,
+    date: measure.date,
+    result: parsed,
+  };
+
+  return res.status(200).send(answer);
+};
+
 module.exports = {
   create,
   update,
   getMeasures,
+  getAnalysisById,
 };

@@ -32,5 +32,6 @@ router.post('/session/active', asyncRoute(sessionController.active));
 router.post('/session/active-for-module', asyncRoute(authController.verifyToken), asyncRoute(sessionController.activeForModule));
 router.get('/session/history', asyncRoute(authController.verifyToken), asyncRoute(sessionController.history));
 
+router.get('/analysis/:analysisId', asyncRoute(measureController.getAnalysisById));
 
 module.exports = router;

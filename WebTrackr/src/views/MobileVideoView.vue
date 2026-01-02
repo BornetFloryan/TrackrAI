@@ -23,6 +23,7 @@
 <script setup>
 import { ref } from 'vue'
 import { AnalysisSocket } from '../services/analysis.ws'
+import measureService from '../services/measure.service'
 
 const videoFile = ref(null)
 const result = ref(null)
@@ -32,31 +33,63 @@ function onFile(e) {
   videoFile.value = e.target.files[0]
 }
 
+function bufferToBase64(buffer) {
+  let binary = ''
+  const bytes = new Uint8Array(buffer)
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
+async function loadAnalysis(analysisId) {
+  console.log('Loading analysis', analysisId)
+  const data = await measureService.fetchAnalysis(analysisId)
+  console.log('Analysis data', data)
+  result.value = data.result.analysis
+}
+
 async function sendVideo() {
   if (!videoFile.value) return
+
   loading.value = true
   result.value = null
 
-  const ws = new WebSocket(import.meta.env.VITE_ANALYZE_WS_URL)
-  await ws.waitOpen()
+  let socket
+  try {
+    socket = new AnalysisSocket()
+    await socket.waitOpen()
+  } catch (e) {
+    console.error('WS error', e)
+    loading.value = false
+    alert('Impossible de se connecter au serveur d’analyse')
+    return
+  }
 
-  ws.sendJson({
-    type: 'START',
-    exercise: 'squat',
-    size: videoFile.value.size
+  socket.send({
+    type: 'START_ANALYSIS',
+    exercise: 'squat'
   })
 
   const buffer = await videoFile.value.arrayBuffer()
-  ws.sendBinary(buffer)
-  ws.sendJson({ type: 'END' })
+  socket.send({
+    type: 'VIDEO_CHUNK',
+    data: bufferToBase64(buffer)
+  })
 
-  ws.ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data)
+  socket.send({ type: 'END_ANALYSIS' })
+
+  socket.onMessage(async (msg) => {
     if (msg.type === 'RESULT') {
-      result.value = msg.analysis
+      const analysisId = msg.data.analysisId
+      socket.close()
+
+      await loadAnalysis(analysisId)
+
       loading.value = false
-      ws.close()
     }
-  }
+  })
 }
 </script>
+

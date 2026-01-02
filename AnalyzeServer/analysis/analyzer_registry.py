@@ -21,7 +21,6 @@ def analyze_video_for_exercise(
             "metrics": {},
         }
 
-    # payload final (pour mobile + central)
     return {
         "analysisId": analysis_id,
         "userId": user_id,

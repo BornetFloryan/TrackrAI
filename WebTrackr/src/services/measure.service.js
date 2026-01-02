@@ -11,4 +11,11 @@ export default {
     if (res.data.error !== 0) throw new Error(res.data.data)
     return res.data.data
   },
+  async fetchAnalysis(analysisId) {
+    console.log('Fetching analysis', analysisId)
+    const res = await fetch(`/trackrapi/analysis/${analysisId}`)
+    if (!res.ok) throw new Error('Analysis not found')
+      const json = await res.json()
+    return json.data
+  }
 }

@@ -1,10 +1,22 @@
 services:
   mongo:
     image: mongo:4.4
-    volumes:
-      - mongo-data:/data/db
+    container_name: trackr-mongo-dev
     ports:
       - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  central:
+    build: ./CentralServer
+    container_name: trackr-central-dev
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - TRACKR_API_URL=http://trackr-api:4567/trackrapi
+    ports:
+      - "29000:9000"
+    depends_on:
+      - mongo
 
   trackr-api:
     image: node:20
@@ -16,26 +28,27 @@ services:
     environment:
       - MONGODB_URL=mongodb://mongo:27017/trackrai
       - PORT=4567
-      - CENTRAL_HOST=host.docker.internal
+      - CENTRAL_HOST=central
       - CENTRAL_PORT=9000
     ports:
       - "4567:4567"
     depends_on:
       - mongo
+      - central
 
   analyze:
-    image: python:3.11
-    working_dir: /app
-    volumes:
-      - ./AnalyzeServer:/app
-    command: sh -c "pip install -r requirements.txt && python main.py"
+    build: ./AnalyzeServer
+    container_name: trackr-analyze-dev
     environment:
-      - CENTRAL_HOST=host.docker.internal
+      - WS_HOST=0.0.0.0
+      - WS_PORT=6000
+      - CENTRAL_HOST=central
       - CENTRAL_PORT=9000
+      - CENTRAL_ENABLED=1
     ports:
       - "6000:6000"
     depends_on:
-      - trackr-api
+      - central
 
   frontend:
     image: node:20
@@ -43,12 +56,15 @@ services:
     volumes:
       - ./WebTrackr:/app
       - /app/node_modules
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    command: sh -c "npm install && npm run dev -- --host"
     environment:
       - VITE_API_BASE_URL=/trackrapi
       - VITE_ANALYZE_WS_URL=ws://localhost:6000
     ports:
       - "5173:5173"
+    depends_on:
+      - trackr-api
+      - analyze
 
 volumes:
   mongo-data:
