@@ -12,7 +12,7 @@
       <h3>Score : {{ result.score }}</h3>
       <ul>
         <li v-for="e in result.errors" :key="e">❌ {{ e }}</li>
-       </ul>
+      </ul>
       <ul>
         <li v-for="t in result.tips" :key="t">💡 {{ t }}</li>
       </ul>
@@ -41,13 +41,6 @@ function bufferToBase64(buffer) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
   }
   return btoa(binary)
-}
-
-async function loadAnalysis(analysisId) {
-  console.log('Loading analysis', analysisId)
-  const data = await measureService.fetchAnalysis(analysisId)
-  console.log('Analysis data', data)
-  result.value = data.result.analysis
 }
 
 async function sendVideo() {
@@ -82,14 +75,14 @@ async function sendVideo() {
 
   socket.onMessage(async (msg) => {
     if (msg.type === 'RESULT') {
-      const analysisId = msg.data.analysisId
+      console.log('Received analysis result', msg)
+      result.value = msg.data.analysis
+      loading.value = false
       socket.close()
 
-      await loadAnalysis(analysisId)
-
-      loading.value = false
+      console.log('Analysis stored with id', msg.data.analysisId)
     }
   })
+
 }
 </script>
-
