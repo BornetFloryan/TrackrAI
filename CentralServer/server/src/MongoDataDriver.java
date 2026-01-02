@@ -2,10 +2,12 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Base64;
 
 import org.bson.Document;
 
@@ -131,11 +133,24 @@ public class MongoDataDriver implements DataDriver {
         return "OK";
     }
 
-    public synchronized String saveAnalysis(String type, String date, String value) {
-        Measure m = new Measure(type, LocalDateTime.parse(date), value, null);
+    public synchronized String saveAnalysis(
+            String type,
+            String date,
+            String value,
+            String analysisId
+    ) {
+        Measure m = new Measure(
+                type,
+                LocalDateTime.parse(date),
+                value,
+                null
+        );
+        m.setAnalysisId(analysisId);
+        System.out.println(m.toString());
         measures.insertOne(m);
         return "OK";
     }
+
 
     public boolean isSessionActive(String sessionId) {
         // Mongo driver does NOT handle sessions

@@ -10,6 +10,7 @@ public class Measure {
     private LocalDateTime date;
     private String value;
     private ObjectId module;
+    private String analysisId;
 
     public Measure() {}
 
@@ -59,6 +60,10 @@ public class Measure {
     public void setModule(ObjectId module) {
         this.module = module;
     }
+
+    public String getAnalysisId() { return analysisId; }
+
+    public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
 
     public String toString() {
         return id+" "+type+" "+date+" "+value+" "+module;

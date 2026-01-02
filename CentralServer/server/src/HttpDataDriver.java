@@ -90,7 +90,7 @@ public class HttpDataDriver implements DataDriver {
         return sendMeasure(payload);
     }
 
-    public synchronized String saveAnalysis(String type, String date, String value) {
+    public synchronized String saveAnalysis(String type, String date, String value, String analysisId) {
 
         String payload = "{\"type\": \""+type+"\", \"date\": \""+date+"\", \"value\": \""+value+"\"}";
         return sendMeasure(payload);

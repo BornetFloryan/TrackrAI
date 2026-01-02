@@ -200,9 +200,18 @@ class ThreadServer extends Thread {
             return;
         }
 
+        String[] parts = params[3].split("\\|", 2);
+        String analysisId = parts[0];
+        String value = parts.length > 1 ? parts[1] : "";
+
         // (un)comment to choose direct mongo access or through the node API
         // String answer = exchanger.getMongoDriver().saveMeasure(params[1], params[2], params[3], params[4]);
-        String answer = exchanger.getMongoDriver().saveAnalysis(params[1], params[2], params[3]);
+        String answer = exchanger.getMongoDriver().saveAnalysis(
+                params[1], // type
+                params[2], // date
+                value,
+                analysisId
+        );
 
         System.out.println(answer);
         ps.println(answer);
