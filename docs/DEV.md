@@ -1,4 +1,3 @@
-````md
 # Environnement de développement – TrackrAI
 
 Ce document explique **comment lancer et utiliser TrackrAI en développement**  
@@ -44,7 +43,6 @@ sur **Windows (via WSL)** et **Linux**, sans Android Studio.
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
-````
 
 Cela démarre :
 
