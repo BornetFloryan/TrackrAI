@@ -43,7 +43,7 @@ sur **Windows (via WSL)** et **Linux**, sans Android Studio.
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
-
+```
 Cela démarre :
 
 * MongoDB
