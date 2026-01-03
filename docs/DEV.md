@@ -1,155 +1,156 @@
 # Environnement de développement – TrackrAI
 
-Ce document explique **comment lancer et utiliser TrackrAI en développement**  
-sur **Windows (via WSL)** et **Linux**, sans Android Studio.
+Ce document explique comment lancer TrackrAI **en développement**, avec **tous les services Dockerisés**,
+sur Windows (WSL recommandé) ou Linux.
+
+Aucune installation d’Android Studio n’est requise.
 
 ---
 
-## Vue d’ensemble
+## 🧱 Vue d’ensemble – Services en DEV
 
-### Services en dev
-
-| Service          | Runtime     | Port | Remarque |
-|------------------|-------------|------|---------|
-| Frontend (Vue)   | Docker      | 5173 | Vite (hot reload) |
-| API Trackr       | Docker      | 4567 | Node.js |
-| MongoDB          | Docker      | 27017 | Base de données |
-| Central Server   | IntelliJ    | 9000 | Java, hors Docker |
-| Analyze Server   | Python      | 6000 | WebSocket analyse |
-| Mobile (Android) | Capacitor   | —    | Accès au frontend dev |
+| Service           | Runtime | Port | Remarque |
+|------------------|--------|------|---------|
+| Frontend (Vue)   | Docker | 5173 | Vite + hot reload |
+| API Trackr       | Docker | 4567 | Node.js |
+| Central Server   | Docker | 9000 | TCP (Java) |
+| Analyze Server   | Docker | 6000 | WebSocket (Python) |
+| MongoDB          | Docker | 27017 | Base de données |
+| Mobile (Android) | Capacitor | — | Affichage du frontend dev |
 
 ---
 
-## Prérequis
+## ✅ Prérequis
 
 ### Obligatoires
-- Docker + Docker Compose
+- Docker
+- Docker Compose
 - Node.js ≥ 20
-- Java (JDK géré par IntelliJ)
-- Python ≥ 3.10 (venv pour AnalyzeServer)
-- Téléphone Android avec **débogage USB activé**
+- Téléphone Android avec débogage USB activé
 
 ### Optionnels
-- WSL (pour Windows)
-- adb (Android Debug Bridge)
+- WSL (recommandé sous Windows)
+- `adb` (Android Debug Bridge)
 
 ---
 
-## Lancement des services (DEV)
-
-### 1. Démarrer les services Docker
+## ▶️ Lancement de l’environnement DEV
 
 À la racine du projet :
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
-```
-Cela démarre :
+````
+
+Cela démarre automatiquement :
 
 * MongoDB
 * API Trackr
+* Central Server
+* Analyze Server
 * Frontend (Vite)
 
 ---
 
-### 2. Démarrer le Central Server (Java)
-
-Le **Central Server n’est pas dockerisé en dev**.
-
-* Ouvrir `CentralServer` dans IntelliJ
-* Lancer la classe principale :
-
-```text
-TrackrCentralServer 9000
-```
-
-Le serveur écoute sur :
-
-```text
-http://localhost:9000
-```
-
----
-
-### 3. Démarrer le Analyze Server (Python)
-
-```bash
-cd AnalyzeServer
-python -m venv .venv
-source .venv/bin/activate   # Linux / WSL
-# ou .venv\Scripts\activate # Windows
-
-pip install -r requirements.txt
-python main.py
-```
-
-Le serveur WebSocket écoute sur :
-
-```text
-ws://localhost:6000
-```
-
----
-
-## Accès au Frontend
+## 🌐 Accès aux services
 
 ### Depuis le PC
 
-```text
-http://localhost:5173
-```
-
----
+* Frontend : [http://localhost:5173](http://localhost:5173)
+* API : [http://localhost:4567/trackrapi](http://localhost:4567/trackrapi)
 
 ### Depuis un téléphone (DEV live)
 
 1. Récupérer l’IP locale du PC :
 
 ```bash
-ip addr   # Linux / WSL
+ip addr
 ```
 
 Exemple :
 
-```text
+```
 192.168.1.20
 ```
 
-2. Accéder au frontend depuis le téléphone :
+2. Accéder au frontend :
 
-```text
+```
 http://192.168.1.20:5173
 ```
 
 ---
 
-## Communication Frontend ↔ API
+## 🔁 Communication Frontend ↔ API
 
-### Principe (IMPORTANT)
+### Principe clé (IMPORTANT)
 
-Le frontend **n’utilise jamais d’IP d’API**.
+Le frontend **n’utilise jamais d’IP fixe pour l’API**.
 
 Il utilise uniquement :
 
-```text
+```
 /trackrapi
 ```
 
-### En dev
+### En développement
 
-* Vite proxy `/trackrapi` → `trackr-api:4567`
+* Vite proxy :
 
-### En prod
+```
+/trackrapi → trackr-api:4567
+/ws        → analyze:6000
+```
 
-* Nginx proxy `/trackrapi` → `trackr-api:4567`
+### En production
 
-➡️ **Même code en dev et en prod**
+* Nginx proxy :
+
+```
+/trackrapi → trackr-api:4567
+/ws        → analyze:6000
+```
+
+➡️ Même code frontend en dev et en prod.
 
 ---
 
-## Mobile (Capacitor – DEV sans Android Studio)
+## 🎥 Analyse vidéo (WebSocket)
 
-### Configuration Capacitor
+### Fonctionnement
+
+1. Le frontend ouvre une connexion WebSocket
+2. Envoie :
+
+   * START_ANALYSIS
+   * VIDEO_CHUNK (base64)
+   * END_ANALYSIS
+3. Le serveur d’analyse :
+
+   * traite la vidéo
+   * renvoie le résultat
+   * transmet l’analyse au Central Server
+4. Le frontend récupère le résultat via l’API
+
+### URL WebSocket en DEV
+
+* Depuis le PC :
+
+```
+ws://localhost:6000
+```
+
+* Depuis un téléphone :
+
+```
+ws://<IP_DU_PC>:6000
+```
+
+---
+
+## 📱 Mobile – Capacitor (DEV sans Android Studio)
+
+### Configuration locale (non commitée)
 
 `capacitor.config.json` :
 
@@ -165,42 +166,37 @@ Il utilise uniquement :
 }
 ```
 
-⚠️ L’IP **n’est jamais commitée**
-→ à adapter localement selon la machine
+⚠️ L’IP dépend de la machine → ne jamais commit ce fichier modifié.
 
 ---
 
-### Lancer l’app sur le téléphone
+### Lancer l’application sur le téléphone
 
-Téléphone branché en USB + débogage activé :
+Téléphone branché en USB :
 
 ```bash
 npx cap sync android
 npx cap run android --target=device
 ```
 
-➡️ L’app affiche **le frontend Vite en live**
+➡️ L’application affiche le frontend Vite **en live**
 ➡️ Toute modification du frontend est visible instantanément
 
 ---
 
-## WebSocket – Analyse vidéo
+## 🧪 Vérification rapide
 
-* Le frontend envoie la vidéo via WebSocket
-* Le Analyze Server traite et renvoie :
+* ✔️ Accès frontend PC
+* ✔️ Accès frontend téléphone
+* ✔️ Upload vidéo
+* ✔️ Analyse reçue
+* ✔️ Données stockées en MongoDB
+* ✔️ Récupération via l’API
 
-  * score
-  * erreurs biomécaniques
-  * conseils
+---
 
-URL WebSocket en dev :
+## 🛑 Arrêt des services
 
-```text
-ws://localhost:6000
-```
-
-Depuis mobile :
-
-```text
-ws://<IP_DU_PC>:6000
+```bash
+docker compose -f docker-compose.dev.yml down
 ```
