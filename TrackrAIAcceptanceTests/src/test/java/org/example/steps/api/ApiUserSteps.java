@@ -25,6 +25,7 @@ public class ApiUserSteps {
     @When("je crée un utilisateur avec un login déjà existant")
     public void creer_login_existant() throws Exception {
         creer_utilisateur();
+        creer_utilisateur();
     }
 
     @Given("je suis authentifié")

@@ -1,6 +1,7 @@
-Feature: Gestion de plusieurs clients TCP
+@central
+Feature: Multi-clients
 
-  Scenario: Connexion simultanée de plusieurs clients
-    Given le serveur central est démarré
-    When plusieurs clients se connectent
-    Then chaque client est pris en charge
+  Scenario: Connexion simultanée
+    Given le serveur central est accessible
+    When deux clients TCP se connectent
+    Then les deux connexions sont acceptées
