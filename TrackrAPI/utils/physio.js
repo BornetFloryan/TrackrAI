@@ -40,13 +40,25 @@ function movingAverage(series, window = 5) {
   
   function estimateStress({ rmssd, hr }) {
     if (Number.isFinite(rmssd) && rmssd > 0) {
-      const x = clamp((120 - rmssd) / 110, 0, 1);
-      return Math.round(x * 100);
+      const ln = Math.log(rmssd);
+  
+      const LN_LOW  = Math.log(15);
+      const LN_HIGH = Math.log(60);
+  
+      const x = clamp(
+        (LN_HIGH - ln) / (LN_HIGH - LN_LOW),
+        0,
+        1
+      );
+
+      return Math.round(20 + x * 60);
     }
+  
     if (Number.isFinite(hr) && hr > 0) {
-      const x = clamp((hr - 55) / 135, 0, 1);
-      return Math.round(x * 100);
+      const x = clamp((hr - 60) / 60, 0, 1);
+      return Math.round(30 + x * 50);
     }
+  
     return null;
   }
   

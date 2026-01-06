@@ -1,81 +1,45 @@
-const { spawn } = require("child_process");
-const { v4: uuidv4 } = require("uuid");
+const path = require('path')
+const { spawnSync } = require('child_process')
+const Session = require('../models/session.model')
+const { answer } = require('./ControllerAnswer')
 
-const Session = require("../models/session.model");
-const Measure = require("../models/measure.model");
+const trainModel = async (req, res) => {
+  answer.reset()
+  const script = path.join(__dirname, '..', 'python', 'train_model.py')
+  const out = spawnSync('python3', [script], { encoding: 'utf-8', env: process.env })
 
-const { answer } = require("./ControllerAnswer");
+  if (out.status !== 0) {
+    answer.set({ error: 500, status: 500, data: out.stderr || 'TRAIN FAILED' })
+    return res.status(500).send(answer)
+  }
 
-function b64json(obj) {
-  return Buffer.from(JSON.stringify(obj), "utf-8").toString("base64");
+  let payload = out.stdout
+  try { payload = JSON.parse(out.stdout) } catch {}
+  answer.setPayload(payload)
+  return res.status(200).send(answer)
 }
 
-const analyzeSession = async (req, res, next) => {
-  answer.reset();
-
-  const { sessionId } = req.body;
-  if (!sessionId) {
-    answer.set({ error: 400, status: 400, data: "sessionId manquant" });
-    return next(answer);
+const predictForSession = async (req, res) => {
+  answer.reset()
+  const { sessionId } = req.params
+  const s = await Session.findOne({ sessionId }).lean().exec()
+  if (!s) {
+    answer.set({ error: 404, status: 404, data: 'session not found' })
+    return res.status(404).send(answer)
   }
 
-  const session = await Session.findOne({ sessionId }).exec();
-  if (!session) {
-    answer.set({ error: 404, status: 404, data: "Session introuvable" });
-    return next(answer);
+  const script = path.join(__dirname, '..', 'python', 'predict_session.py')
+  const out = spawnSync('python3', [script, String(sessionId)], { encoding: 'utf-8', env: process.env })
+
+  if (out.status !== 0) {
+    answer.set({ error: 500, status: 500, data: out.stderr || 'PREDICT FAILED' })
+    return res.status(500).send(answer)
   }
 
-  const py = spawn("python3", ["ai/analyze_session.py", sessionId], {
-    env: process.env,
-    cwd: process.cwd(),
-  });
+  const result = JSON.parse(out.stdout)
 
-  let out = "";
-  let err = "";
+  answer.setPayload(result)
+  return res.status(200).send(answer)
+}
 
-  py.stdout.on("data", (d) => (out += d.toString("utf-8")));
-  py.stderr.on("data", (d) => (err += d.toString("utf-8")));
-
-  py.on("close", async (code) => {
-    if (code !== 0) {
-      answer.set({
-        error: 500,
-        status: 500,
-        data: `Python error (code ${code}) ${err || out}`,
-      });
-      return next(answer);
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(out);
-    } catch (e) {
-      answer.set({ error: 500, status: 500, data: "Sortie python invalide" });
-      return next(answer);
-    }
-
-    const analysisId = uuidv4();
-
-    // On stocke le rapport IA comme une Measure, réutilisable via GET /analysis/:analysisId
-    const m = {
-      type: "analysis_report",
-      date: new Date(),
-      value: b64json(parsed),
-      module: session.module,
-      session: session._id,
-      analysisId,
-    };
-
-    const saved = await Measure.create(m);
-
-    answer.setPayload({
-      analysisId,
-      measureId: saved._id,
-      result: parsed,
-    });
-
-    return res.status(201).send(answer);
-  });
-};
-
-module.exports = { analyzeSession };
+module.exports = { trainModel, predictForSession }

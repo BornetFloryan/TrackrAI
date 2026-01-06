@@ -15,17 +15,7 @@ let SessionSchema = new Schema({
 
     endDate: { type: Date },
 
-    stats: {
-        durationMs: Number,
-        distanceKm: Number,
-        steps: Number,
-        hrAvg: Number,
-        hrMax: Number,
-        stress: Number,
-        score: Number,
-      },
-      
-    isFinalized: { type: Boolean, default: false },
+    stats: { type: mongoose.Schema.Types.Mixed },
 
 },{ versionKey: false });
 

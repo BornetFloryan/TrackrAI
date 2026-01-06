@@ -21,6 +21,39 @@
         <GpsMap :points="gpsPoints" />
       </div>
 
+      <div class="card" style="margin-top:1rem;" v-if="stats?.score">
+        <h3 style="margin:0 0 .5rem 0;">Analyse IA de la séance</h3>
+
+        <p class="muted">
+          Score global calculé automatiquement à partir des données physiologiques.
+        </p>
+
+        <div class="grid grid-3" style="margin-top:.5rem;">
+          <StatCard title="Score global" :value="stats.score.global?.toFixed(1) ?? '—'"
+            :sub="`Confiance: ${(stats.score.confidence * 100).toFixed(0)} %`" />
+
+          <StatCard title="Charge" :value="stats.score.components.load" sub="Distance / durée" />
+
+          <StatCard title="Intensité" :value="stats.score.components.intensity" sub="Fréquence cardiaque" />
+        </div>
+
+        <div class="grid grid-2" style="margin-top:.75rem;">
+          <StatCard title="Récupération" :value="stats.score.components.recovery" sub="Stress physiologique" />
+
+          <StatCard title="Analyse IA" value="XGBoost (régression)"
+            :sub="`Entraînée sur score physiologique pondéré`" />
+
+        </div>
+
+        <p class="muted" style="margin-top:.75rem;">
+          Pondérations utilisées :
+          Charge {{ stats.score.weights.wLoad * 100 }} %,
+          Intensité {{ stats.score.weights.wIntensity * 100 }} %,
+          Récupération {{ stats.score.weights.wRecovery * 100 }} %.
+        </p>
+      </div>
+
+
       <div class="card" style="margin-top:1rem;">
         <h3 style="margin:0 0 .5rem 0;">Mesures brutes</h3>
         <p style="color:var(--muted); margin:0 0 .75rem 0;">
@@ -115,7 +148,6 @@ const speedLabel = computed(() => {
 
 const stress = computed(() => {
   const hrAvg = hrSeries.value.length ? hrSeries.value.reduce((a, b) => a + (b.value > 0 ? b.value : 0), 0) / Math.max(1, hrSeries.value.filter(x => x.value > 0).length) : null
-  // rmssd dernier
   let rmssd = null
   for (let i = measures.value.length - 1; i >= 0; i--) {
     if (measures.value[i].type === 'rmssd') {
@@ -129,12 +161,19 @@ const stress = computed(() => {
 const stressLabel = computed(() =>
   stats.value?.stress ?? '—'
 )
+
+const weightLabel = computed(() => {
+  if (!stats.value?.score?.weights) return '—'
+  const w = stats.value.score.weights
+  return `${w.wLoad * 100}% / ${w.wIntensity * 100}% / ${w.wRecovery * 100}%`
+})
+
 const stressSub = computed(() =>
   stats.value.steps ? `Pas estimés: ${stats.value.steps}` : ''
 )
 
 const dureeSub = computed(() =>
-  stats.value.score ? `Score: ${stats.value.score}` : ''
+  stats.value.score.global ? `Score: ${stats.value.score.global.toFixed(2)}` : ''
 )
 
 </script>

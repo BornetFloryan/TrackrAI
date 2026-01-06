@@ -35,6 +35,7 @@ router.get('/session/history', asyncRoute(authController.verifyToken), asyncRout
 
 router.get('/analysis/:analysisId', asyncRoute(measureController.getAnalysisById));
 
-router.post('/ai/analyze-session', asyncRoute(aiController.analyzeSession));
+router.post('/train', aiController.trainModel)
+router.get('/predict/:sessionId', aiController.predictForSession)
 
 module.exports = router;

@@ -1,3 +1,6 @@
+const { computePerformanceScore } = require('./utils/performanceScore')
+const { spawnSync } = require('child_process')
+
 const User = require('./models/user.model');
 const Module = require('./models/module.model');
 const Chipset = require('./models/chipset.model');
@@ -5,8 +8,7 @@ const bcrypt = require('bcryptjs');
 const Session = require('./models/session.model');
 const Measure = require('./models/measure.model');
 const SALT_WORK_FACTOR = 10;
-
-const { computePerformanceScore } = require('./utils/performanceScore')
+const path = require('path')
 
 let gps = null;
 let imu = null;
@@ -243,6 +245,19 @@ async function initDemoData() {
       };
 
       await session.save();
+
+      const script = path.join(__dirname, 'python', 'predict_session.py')
+      const out = spawnSync('python3', [script, session.sessionId], {
+        encoding: 'utf-8',
+        env: process.env,
+      })
+
+      if (out.status === 0 && out.stdout) {
+        const ai = JSON.parse(out.stdout)
+        session.stats.aiScore = ai.aiScore
+        session.stats.aiExplain = ai.explain
+        await session.save()
+      }
 
       console.log(`added DEMO session ${d + 1} (15 min)`);
     }

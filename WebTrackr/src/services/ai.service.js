@@ -1,10 +1,9 @@
-export default {
-  async analyzeSession(sessionId) {
-    // plus tard :
-    // return api.post('/ai/analyze', { sessionId })
-    return {
-      fatigue: null,
-      advice: 'Analyse bientôt disponible'
-    }
-  }
+import api from './api'
+
+export async function trainModel() {
+  return api.post('/train')
+}
+
+export async function predictSession(sessionId) {
+  return api.get(`/predict/${sessionId}`)
 }

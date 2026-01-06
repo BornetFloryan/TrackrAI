@@ -146,11 +146,7 @@ async function refreshNow() {
   await fetchMeasures()
 }
 
-/* =========================
-   LIVE DATA (VRAIES MESURES)
-========================= */
 function dedupeGps(points, minMoveMeters = 1.5) {
-  // Supprime les points GPS identiques / bruités (si immobile)
   if (points.length < 2) return points
   const out = [points[0]]
   for (let i = 1; i < points.length; i++) {
@@ -168,16 +164,13 @@ async function fetchMeasures() {
 
   const list = await measureStore.fetch(moduleKey.value)
 
-  // HR / RMSSD / SPEED
   lastHr.value = lastValue(list, 'heart_rate')
   lastRmssd.value = lastValue(list, 'rmssd')
   lastSpeed.value = lastValue(list, 'gps_speed')
 
-  // GPS track
   const track = buildGpsTrack(list)
   const rawPoints = track.map(p => [p.lat, p.lon])
 
-  // Filtrage anti-bruit GPS (important si tu es immobile)
   gpsPoints.value = dedupeGps(rawPoints, 1.5)
 
   if (rawPoints.length) {
@@ -187,8 +180,6 @@ async function fetchMeasures() {
     lastGpsLabel.value = ''
   }
 
-  // Heading: GPS bearing uniquement (fiable)
-  // Si immobile ou points insuffisants => null
   if (gpsPoints.value.length >= 2) {
     const a = gpsPoints.value[gpsPoints.value.length - 2]
     const b = gpsPoints.value[gpsPoints.value.length - 1]
@@ -197,19 +188,15 @@ async function fetchMeasures() {
     headingDeg.value = null
   }
 
-  // Steps estimés à partir acc
   const ax = measuresOf(list, 'acc_x')
   const ay = measuresOf(list, 'acc_y')
   const az = measuresOf(list, 'acc_z')
   stepsValue.value = estimateSteps(ax, ay, az)
 
-  // Stress
+  console.log("rmssd : ", lastRmssd.value, ", hr : ", lastHr.value)
   stressValue.value = estimateStress({ rmssd: lastRmssd.value, hr: lastHr.value })
 }
 
-/* =========================
-   POLLING
-========================= */
 function startPolling() {
   stopPolling()
   fetchMeasures()
@@ -252,7 +239,6 @@ function startSessionPolling() {
 
     const res = await sessionStore.syncActiveForModule(moduleKey.value)
     if (!res?.active) {
-      //errorMsg.value = 'Session stoppée automatiquement (module inactif)'
       stopPolling()
       stopTimer()
     }
@@ -265,9 +251,6 @@ function stopSessionPolling() {
 }
 
 
-/* =========================
-   TIMER
-========================= */
 function startTimer() {
   stopTimer()
   timer = setInterval(() => {
@@ -287,9 +270,6 @@ onBeforeUnmount(() => {
   stopSessionPolling()
 })
 
-/* =========================
-   COMPUTED
-========================= */
 const elapsedLabel = computed(() => {
   const s = Math.floor(elapsedMs.value / 1000)
   const mm = Math.floor(s / 60)

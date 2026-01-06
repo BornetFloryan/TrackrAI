@@ -12,9 +12,7 @@ const tcpService = require("../services/tcp.service");
 const Measure = require('../models/measure.model')
 const { computeSessionStats } = require('../utils/sessionStats')
 
-/**
- * START SESSION – FRONT
- */
+
 const start = async (req, res, next) => {
   answer.reset();
 
@@ -60,7 +58,6 @@ const start = async (req, res, next) => {
 
   await session.save();
 
-  // TCP = vérité
   try {
     const tcpResp = await tcpService.sendToCentralServer(
       `START_SESSION_FOR_MODULE ${moduleKey} ${sessionId}`
@@ -90,10 +87,6 @@ const start = async (req, res, next) => {
   return res.status(201).send(answer);
 };
 
-/**
- * STOP SESSION – FRONT
- * TCP PRIORITAIRE
- */
 const stop = async (req, res, next) => {
   answer.reset()
 
@@ -118,7 +111,6 @@ const stop = async (req, res, next) => {
     endDate: { $exists: false },
   }).exec()
 
-  // idempotent
   if (!session) {
     answer.setPayload({ stopped: true, alreadyStopped: true })
     return res.status(200).send(answer)
@@ -153,16 +145,28 @@ const stop = async (req, res, next) => {
 
   session.stats = stats
   session.endDate = new Date()
-
   await session.save()
+
+  try {
+    const script = path.join(__dirname, '..', 'python', 'predict_session.py')
+    const out = spawnSync('python3', [script, String(session.sessionId)], {
+      encoding: 'utf-8',
+      env: process.env,
+    })
+
+    if (out.status === 0 && out.stdout) {
+      const ai = JSON.parse(out.stdout)
+      session.stats.aiScore = ai.aiScore
+      session.stats.aiExplain = ai.explain
+      await session.save()
+    }
+  } catch (e) {
+  }
 
   answer.setPayload({ stopped: true })
   return res.status(200).send(answer)
 }
 
-/**
- * SESSION ACTIVE ? – TCP
- */
 const active = async (req, res) => {
   answer.reset();
 
@@ -181,9 +185,6 @@ const active = async (req, res) => {
   return res.status(200).send(answer);
 };
 
-/**
- * SESSION ACTIVE POUR MODULE – FRONT
- */
 const activeForModule = async (req, res) => {
   answer.reset();
 
@@ -213,9 +214,6 @@ const activeForModule = async (req, res) => {
   return res.status(200).send(answer);
 };
 
-/**
- * HISTORIQUE
- */
 const history = async (req, res, next) => {
   answer.reset()
 
