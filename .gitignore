@@ -106,3 +106,50 @@ coverage/
 # --------------------------------------------------
 arduino/**/build/
 arduino/**/.pio/
+
+# --------------------------------------------------
+# Python
+# --------------------------------------------------
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+.python-version
+
+# Packaging / build
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+
+# Test / quality tools
+.pytest_cache/
+.mypy_cache/
+.pyre/
+.ruff_cache/
+.tox/
+.nox/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Logs Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Python dotenv (déjà présent mais rappel logique)
+.env
+.env.*
+!.env.example
