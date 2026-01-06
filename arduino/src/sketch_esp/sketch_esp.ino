@@ -8,18 +8,19 @@
 #include <WiFiClient.h>
 #include <WiFiManager.h>
 
-#include <TinyGPSPlus.h>
 #include <Wire.h>
 #include <MPU6050.h>
 
+#include <NMEAGPS.h>
+
 #include <BLEDevice.h>
-#include <BLEUtils.h>
 #include <BLEScan.h>
 #include <BLEClient.h>
 
 #include <time.h>
-
 #include <Preferences.h>
+
+#include <math.h>
 
 /* ================= PINS ================= */
 #define GPS_RX_PIN 27
@@ -30,11 +31,22 @@
 #define HR_SERVICE_UUID "180D"
 #define HR_CHAR_UUID    "2A37"
 
+/* ================= FACTORY RESET ================= */
+#define RESET_BTN_PIN 0
+#define RESET_HOLD_MS 5000
+
+/* ================= GPS QUALITY FILTER ================= */
+#define GPS_MIN_DIST_M     1.5     // distance mini entre 2 fixes
+#define GPS_MIN_SPEED_KPH  0.5     // vitesse mini crédible
+#define GPS_MIN_DT_MS      800     // intervalle mini entre fixes
+
 /* ================= OBJETS ================= */
 WiFiClient tcp;
-TinyGPSPlus gps;
 HardwareSerial gpsSerial(2);
 MPU6050 mpu;
+
+NMEAGPS gps;
+gps_fix fix;
 
 Preferences prefs;
 
@@ -54,6 +66,17 @@ uint16_t heartRate = 0;
 /* ================= CONFIG DYNAMIQUE ================= */
 char server_host[64] = "82.64.26.75";
 char server_port[6]  = "29000";
+
+/* ================= GPS FILTER ================= */
+static bool hasLastFix = false;
+static double lastLat = 0.0;
+static double lastLon = 0.0;
+static unsigned long lastFixMs = 0;
+
+/* ================= IMU WARMUP ================= */
+static unsigned long imuStartMs = 0;
+static bool imuReady = false;
+#define IMU_WARMUP_MS 3000   // 3 secondes
 
 /* ================= TIMING ================= */
 unsigned long lastSend = 0;
@@ -89,6 +112,23 @@ float computeRMSSD() {
     s += d * d;
   }
   return sqrt(s / (rrCount - 1));
+}
+
+static inline double deg2rad(double d) { return d * 0.017453292519943295; }
+
+// Distance Haversine en mètres
+static double haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+  const double R = 6371000.0; // m
+  const double dLat = deg2rad(lat2 - lat1);
+  const double dLon = deg2rad(lon2 - lon1);
+
+  const double a =
+    sin(dLat / 2) * sin(dLat / 2) +
+    cos(deg2rad(lat1)) * cos(deg2rad(lat2)) *
+    sin(dLon / 2) * sin(dLon / 2);
+
+  const double c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
+  return R * c;
 }
 
 /* ================= BLE ================= */
@@ -209,9 +249,10 @@ void handleServerCommands() {
 
     if (cmd.startsWith("START_SESSION")) {
       recording = true;
+      imuStartMs = millis();
+      imuReady = false;
       Serial.println("Enregistrement démarré (session)");
-    }
-    else if (cmd == "STOP_SESSION") {
+    } else if (cmd == "STOP_SESSION") {
       recording = false;
       Serial.println("Enregistrement arrêté (session)");
     }
@@ -243,9 +284,38 @@ void setupWiFi() {
   Serial.printf("Serveur : %s:%s\n", server_host, server_port);
 }
 
+/* ===== Factory reset via bouton BOOT ===== */
+void factoryReset() {
+  Serial.println("\n=== FACTORY RESET ===");
+
+  prefs.clear();
+  prefs.end();
+
+  WiFiManager wm;
+  wm.resetSettings();
+
+  Serial.println("WiFi + serveur + moduleKey effacés");
+  Serial.println("Redémarrage...");
+  delay(2000);
+
+  ESP.restart();
+}
+
+
 /* ================= SETUP ================= */
 void setup() {
   Serial.begin(115200);
+
+  pinMode(RESET_BTN_PIN, INPUT_PULLUP);
+  Serial.println("Maintenir BOOT 5s pour reset configuration");
+
+  unsigned long t0 = millis();
+  while (digitalRead(RESET_BTN_PIN) == LOW) {
+    if (millis() - t0 > RESET_HOLD_MS) {
+      factoryReset();
+    }
+    delay(10);
+  }
 
   prefs.begin("trackr", false);
 
@@ -288,6 +358,10 @@ void setup() {
   Wire.begin(SDA_PIN, SCL_PIN);
   mpu.initialize();
 
+  mpu.CalibrateAccel(6);
+  mpu.CalibrateGyro(6);
+  mpu.setDLPFMode(MPU6050_DLPF_BW_20);
+
   initBLE();
 }
 
@@ -303,8 +377,8 @@ void sendHello() {
 void loop() {
   handleServerCommands();
 
-  while (gpsSerial.available())
-    gps.encode(gpsSerial.read());
+  while (gps.available(gpsSerial))
+    fix = gps.read();
 
   // 1) Assurer la connexion TCP (une seule connexion persistante)
   if (!tcp.connected()) {
@@ -342,11 +416,33 @@ void loop() {
   // 4) On n'envoie des mesures que si session active
   if (!recording) return;
 
-  // 5) GPS
-  if (gps.location.isValid()) {
-    sendMeasure("gps_lat", gps.location.lat());
-    sendMeasure("gps_lon", gps.location.lng());
-    sendMeasure("gps_speed", gps.speed.kmph());
+  // 5) GPS (filtré)
+  if (fix.valid.location && fix.valid.speed) {
+    if (!hasLastFix) {
+      sendMeasure("gps_lat", fix.latitude());
+      sendMeasure("gps_lon", fix.longitude());
+    }
+
+    unsigned long nowMs = millis();
+
+    if (hasLastFix && (nowMs - lastFixMs) > GPS_MIN_DT_MS) {
+      double dM = haversineMeters(
+        fix.latitude(), fix.longitude(),
+        lastLat, lastLon
+      );
+
+      if (dM >= GPS_MIN_DIST_M && fix.speed_kph() >= GPS_MIN_SPEED_KPH) {
+
+        sendMeasure("gps_lat", fix.latitude());
+        sendMeasure("gps_lon", fix.longitude());
+        sendMeasure("gps_speed", fix.speed_kph());
+      }
+    }
+
+    lastLat   = fix.latitude();
+    lastLon   = fix.longitude();
+    lastFixMs = nowMs;
+    hasLastFix = true;
   }
 
   // 6) HEART
@@ -361,15 +457,21 @@ void loop() {
     }
   }
 
-  // 7) IMU
-  int16_t ax, ay, az, gx, gy, gz;
-  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+  // 7) IMU (avec warmup)
+  if (imuReady || millis() - imuStartMs >= IMU_WARMUP_MS) {
 
-  sendMeasure("acc_x", ax);
-  sendMeasure("acc_y", ay);
-  sendMeasure("acc_z", az);
-  sendMeasure("gyro_x", gx);
-  sendMeasure("gyro_y", gy);
-  sendMeasure("gyro_z", gz);
+    imuReady = true;
+
+    int16_t ax, ay, az, gx, gy, gz;
+    mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+
+    sendMeasure("acc_x", ax);
+    sendMeasure("acc_y", ay);
+    sendMeasure("acc_z", az);
+    sendMeasure("gyro_x", gx);
+    sendMeasure("gyro_y", gy);
+    sendMeasure("gyro_z", gz);
+  }
 }
+
 
