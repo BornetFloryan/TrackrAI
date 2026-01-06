@@ -336,6 +336,7 @@ const connection = async function (req, res, next) {
       return next(answer)
     }
 
+    console.log("moduleConnection", moduleKey);
     answer.data = mod
     return res.status(200).send(answer)
   } catch (err) {

@@ -7,7 +7,7 @@ export function movingAverage(series, window = 5) {
 }
 
 // Pas estimés: détection de pics sur magnitude d'accélération
-export function estimateSteps(accX, accY, accZ, threshold = 18000) {
+export function estimateSteps(accX, accY, accZ, threshold = 16000) {
   accX = movingAverage(accX)
   accY = movingAverage(accY)
   accZ = movingAverage(accZ)

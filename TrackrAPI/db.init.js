@@ -1,10 +1,13 @@
 const User = require('./models/user.model');
 const Module = require('./models/module.model');
-const Chipset = require('./models/chipset.model')
+const Chipset = require('./models/chipset.model');
 const bcrypt = require('bcryptjs');
+const Session = require('./models/session.model');
+const Measure = require('./models/measure.model');
 const SALT_WORK_FACTOR = 10;
 
-/* ================= CHIPSETS ================= */
+const { computePerformanceScore } = require('./utils/performanceScore')
+
 let gps = null;
 let imu = null;
 let hr  = null;
@@ -12,122 +15,247 @@ let hr  = null;
 async function initChipsets() {
   try {
     gps = await Chipset.findOne({ name: 'gps' }).exec();
-    if (gps === null) {
-      gps = new Chipset({
+    if (!gps) {
+      gps = await new Chipset({
         name: "gps",
         description: "GPS position sensor",
         caps: ["latitude", "longitude", "speed"],
-      });
-      gps = await gps.save();
+      }).save();
       console.log("added gps chipset");
     }
-  } catch (err) {
+  } catch {
     console.log("cannot add gps chipset");
   }
 
   try {
     imu = await Chipset.findOne({ name: 'imu' }).exec();
-    if (imu === null) {
-      imu = new Chipset({
+    if (!imu) {
+      imu = await new Chipset({
         name: "imu",
         description: "Inertial Measurement Unit (MPU6050)",
         caps: ["acceleration", "gyroscope"],
-      });
-      imu = await imu.save();
+      }).save();
       console.log("added imu chipset");
     }
-  } catch (err) {
+  } catch {
     console.log("cannot add imu chipset");
   }
 
   try {
     hr = await Chipset.findOne({ name: 'hr' }).exec();
-    if (hr === null) {
-      hr = new Chipset({
+    if (!hr) {
+      hr = await new Chipset({
         name: "hr",
         description: "Heart rate sensor (BLE)",
         caps: ["heart_rate", "rmssd"],
-      });
-      hr = await hr.save();
+      }).save();
       console.log("added hr chipset");
     }
-  } catch (err) {
+  } catch {
     console.log("cannot add hr chipset");
   }
 }
 
-/* ================= MODULES ================= */
-/*
- * Module de référence ESP32
- * La vraie clé sera générée via AUTOREGISTER
- */
 async function initModules() {
   try {
     let esp32 = await Module.findOne({ name: 'ESP32 Tracker' }).exec();
-    if (esp32 === null) {
-      esp32 = new Module({
+    if (!esp32) {
+      esp32 = await new Module({
         name: "ESP32 Tracker",
         shortName: "esp32",
-        key: "DYNAMIC", // IMPORTANT : clé non utilisée, AUTOREGISTER génère la vraie
+        key: "DYNAMIC",
         uc: "esp32",
-        chipsets: [ gps._id, imu._id, hr._id ],
-      });
-      esp32 = await esp32.save();
+        chipsets: [gps._id, imu._id, hr._id],
+      }).save();
       console.log("added ESP32 reference module");
     }
-  } catch (err) {
+  } catch {
     console.log("cannot add ESP32 module");
   }
 }
 
-/* ================= USERS ================= */
 async function initUsers() {
-  let admin = null;
   try {
-    admin = await User.findOne({ login: 'admin' }).exec();
-    if (admin === null) {
+    let admin = await User.findOne({ login: 'admin' }).exec();
+    if (!admin) {
       const salt = bcrypt.genSaltSync(SALT_WORK_FACTOR);
-      const password = bcrypt.hashSync('admin', salt);
-      admin = new User({
+      admin = await new User({
         login: "admin",
-        password: password,
+        password: bcrypt.hashSync('admin', salt),
         email: "sdomas@univ-fcomte.fr",
         rights: ['admin'],
-      });
-      admin = await admin.save();
+      }).save();
       console.log("added admin");
     }
-  } catch (err) {
+  } catch {
     console.log("cannot add admin");
   }
 
-  let test = null;
   try {
-    test = await User.findOne({ login: 'test' }).exec();
-    if (test === null) {
+    let test = await User.findOne({ login: 'test' }).exec();
+    if (!test) {
       const salt = bcrypt.genSaltSync(SALT_WORK_FACTOR);
-      const password = bcrypt.hashSync('azer', salt);
-      test = new User({
+      test = await new User({
         login: "test",
-        password: password,
+        password: bcrypt.hashSync('azer', salt),
         email: "sdomas@univ-fcomte.fr",
         rights: ['basic'],
-      });
-      test = await test.save();
+      }).save();
       console.log("added test");
     }
-  } catch (err) {
+  } catch {
     console.log("cannot add test");
+  }
+
+  try {
+    let coach = await User.findOne({ login: 'coach' }).exec();
+    if (!coach) {
+      const salt = bcrypt.genSaltSync(SALT_WORK_FACTOR);
+      coach = await new User({
+        login: "coach",
+        password: bcrypt.hashSync('coach', salt),
+        email: "coach@univ-fcomte.fr",
+        rights: ['coach'],
+      }).save();
+      console.log("added coach");
+    }
+  } catch {
+    console.log("cannot add coach");
   }
 }
 
-/* ================= INIT ================= */
+function rnd(min, max) {
+  return min + Math.random() * (max - min);
+}
+function avg(arr) {
+  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+}
+function max(arr) {
+  return arr.length ? Math.max(...arr) : null;
+}
+
+async function initDemoData() {
+  try {
+    const user = await User.findOne({ login: "test" }).exec();
+    const module = await Module.findOne({ name: "ESP32 Tracker" }).exec();
+    if (!user || !module) return;
+
+    const existing = await Session.findOne({ sessionId: /^DEMO-SESSION-/ }).exec();
+    if (existing) {
+      console.log("demo sessions already exist");
+      return;
+    }
+
+    const now = Date.now();
+    const days = 7;
+    const sessionDurationMin = 15;
+    const stepMs = 10 * 1000;
+
+    for (let d = 0; d < days; d++) {
+      const dayOffset = (days - 1 - d) * 24 * 60 * 60 * 1000;
+      const startDate = new Date(now - dayOffset);
+      const endDate = new Date(startDate.getTime() + sessionDurationMin * 60 * 1000);
+
+      const session = await new Session({
+        sessionId: `DEMO-SESSION-${d + 1}`,
+        user: user._id,
+        module: module._id,
+        startDate,
+        lastMeasureAt: endDate,
+        endDate,
+      }).save();
+
+      const measures = [];
+      const points = Math.floor((sessionDurationMin * 60 * 1000) / stepMs);
+
+      let baseLat = 47.2400 + d * 0.0005;
+      let baseLon = 6.0200 + d * 0.0005;
+      const fatigue = d * 0.1;
+
+      for (let i = 0; i < points; i++) {
+        const t = new Date(startDate.getTime() + i * stepMs);
+
+        const hrVal = Math.round(120 + Math.sin(i / 8) * 20 + fatigue * 15 + rnd(-4, 4));
+        const rmssd = Math.max(18, 40 - fatigue * 8 + rnd(-3, 3));
+        const speed = Math.max(2.3, 2.8 - fatigue * 0.3 + rnd(-0.2, 0.2));
+
+        baseLat += rnd(0.00001, 0.00003);
+        baseLon += rnd(0.00001, 0.00003);
+
+        const push = (type, value) => measures.push({
+          type,
+          date: t,
+          value: String(value),
+          module: module._id,
+          session: session._id,
+        });
+
+        push("heart_rate", hrVal);
+        push("rmssd", rmssd.toFixed(1));
+        push("gps_speed", speed.toFixed(2));
+        push("gps_lat", baseLat.toFixed(6));
+        push("gps_lon", baseLon.toFixed(6));
+        push("acc_x", Math.round(rnd(-1200, 1200)));
+        push("acc_y", Math.round(rnd(-1200, 1200)));
+        push("acc_z", Math.round(16384 + rnd(-1000, 1000)));
+      }
+
+      await Measure.insertMany(measures);
+
+      const durationMs = endDate - startDate;
+
+      const speeds = measures
+        .filter(m => m.type === 'gps_speed')
+        .map(m => Number(m.value))
+        .filter(v => v > 0);
+
+      const distanceKm = speeds.reduce(
+        (sum, v) => sum + (v * 10) / 1000,
+        0
+      );
+
+      const steps = Math.round(distanceKm * 1300);
+
+      const hrValues = measures
+        .filter(m => m.type === 'heart_rate')
+        .map(m => Number(m.value))
+        .filter(v => v > 0);
+
+      const stress =
+        Math.round(
+          50 +
+          (avg(hrValues) - 110) * 0.5 -
+          (steps / durationMs) * 1000
+        )
+
+      session.stats = {
+        durationMs,
+        distanceKm,
+        steps,
+        hrAvg: avg(hrValues),
+        hrMax: max(hrValues),
+        stress: Math.max(0, Math.min(100, stress)),
+        score: computePerformanceScore({
+          distanceKm,
+          hrAvg: avg(hrValues),
+          stress
+        })
+      };
+
+      await session.save();
+
+      console.log(`added DEMO session ${d + 1} (15 min)`);
+    }
+  } catch (e) {
+    console.log("cannot add demo session data", e);
+  }
+}
+
 async function initBdD() {
   await initChipsets();
   await initModules();
   await initUsers();
+  await initDemoData();
 }
 
-module.exports = {
-  initBdD,
-};
+module.exports = { initBdD };

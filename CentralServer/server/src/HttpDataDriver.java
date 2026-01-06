@@ -115,10 +115,17 @@ public class HttpDataDriver implements DataDriver {
         return doc.getInteger("error") == 0;
     }
 
-    public void moduleConnection(String moduleKey, boolean connected) {
+    public synchronized String moduleConnection(String moduleKey, boolean connected) {
         String payload =
-                "{ \"moduleKey\": \"" + moduleKey + "\", \"connected\": " + connected + " }";
-        postRequest("/module/connection", payload);
-    }
+            "{ \"moduleKey\": \"" + moduleKey + "\", \"connected\": " + connected + " }";
+    
+        Document doc = postRequest("/module/connection", payload);
+        if (doc == null) return "ERR cannot join the API";
+    
+        String err = checkError(doc);
+        if (err != null) return "ERR " + err;
+    
+        return "OK";
+    }          
 
 }

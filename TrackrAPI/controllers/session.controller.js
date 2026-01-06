@@ -9,6 +9,9 @@ const ModuleErrors = require("../commons/module.errors");
 const { answer } = require("./ControllerAnswer");
 const tcpService = require("../services/tcp.service");
 
+const Measure = require('../models/measure.model')
+const { computeSessionStats } = require('../utils/sessionStats')
+
 /**
  * START SESSION – FRONT
  */
@@ -92,47 +95,47 @@ const start = async (req, res, next) => {
  * TCP PRIORITAIRE
  */
 const stop = async (req, res, next) => {
-  answer.reset();
+  answer.reset()
 
-  const { moduleKey } = req.body;
+  const { moduleKey } = req.body
   if (!moduleKey) {
     answer.set(
       SessionErrors.getError(SessionErrors.ERR_SESSION_INVALID_REQUEST)
-    );
-    return next(answer);
+    )
+    return next(answer)
   }
 
-  const module = await Module.findOne({ key: moduleKey }).exec();
+  const module = await Module.findOne({ key: moduleKey }).exec()
   if (!module) {
     answer.set(
       ModuleErrors.getError(ModuleErrors.ERR_MODULE_INVALID_MODULE_KEY)
-    );
-    return next(answer);
+    )
+    return next(answer)
   }
 
   const session = await Session.findOne({
     module: module._id,
     endDate: { $exists: false },
-  }).exec();
+  }).exec()
 
   // idempotent
   if (!session) {
-    answer.setPayload({ stopped: true, alreadyStopped: true });
-    return res.status(200).send(answer);
+    answer.setPayload({ stopped: true, alreadyStopped: true })
+    return res.status(200).send(answer)
   }
 
-  let tcpResp;
+  let tcpResp
   try {
     tcpResp = await tcpService.sendToCentralServer(
       `STOP_SESSION_FOR_MODULE ${moduleKey}`
-    );
+    )
   } catch (e) {
     answer.set({
       error: 998,
       status: 503,
       data: "Central TCP unreachable",
-    });
-    return next(answer);
+    })
+    return next(answer)
   }
 
   if (!tcpResp || !tcpResp.startsWith("OK STOPPED")) {
@@ -140,16 +143,22 @@ const stop = async (req, res, next) => {
       error: 997,
       status: 502,
       data: tcpResp || "Invalid TCP response",
-    });
-    return next(answer);
+    })
+    return next(answer)
   }
 
-  session.endDate = new Date();
-  await session.save();
+  const measures = await Measure.find({ session: session._id }).lean().exec()
 
-  answer.setPayload({ stopped: true });
-  return res.status(200).send(answer);
-};
+  const stats = computeSessionStats(measures)
+
+  session.stats = stats
+  session.endDate = new Date()
+
+  await session.save()
+
+  answer.setPayload({ stopped: true })
+  return res.status(200).send(answer)
+}
 
 /**
  * SESSION ACTIVE ? – TCP

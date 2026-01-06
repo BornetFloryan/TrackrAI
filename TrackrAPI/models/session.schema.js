@@ -13,7 +13,19 @@ let SessionSchema = new Schema({
 
     lastMeasureAt: { type: Date },
 
-    endDate: { type: Date }
+    endDate: { type: Date },
+
+    stats: {
+        durationMs: Number,
+        distanceKm: Number,
+        steps: Number,
+        hrAvg: Number,
+        hrMax: Number,
+        stress: Number,
+        score: Number,
+      },
+      
+    isFinalized: { type: Boolean, default: false },
 
 },{ versionKey: false });
 

@@ -6,6 +6,7 @@ const measureController = require('../controllers/measure.controller');
 const userController = require('../controllers/user.controller');
 const authController = require('../controllers/auth.controller');
 const sessionController = require('../controllers/session.controller');
+const aiController = require('../controllers/ai.controller');
 
 const asyncRoute = (ctrl) => (req, res, next) =>
   Promise.resolve(ctrl(req, res, next)).catch(next);
@@ -33,5 +34,7 @@ router.post('/session/active-for-module', asyncRoute(authController.verifyToken)
 router.get('/session/history', asyncRoute(authController.verifyToken), asyncRoute(sessionController.history));
 
 router.get('/analysis/:analysisId', asyncRoute(measureController.getAnalysisById));
+
+router.post('/ai/analyze-session', asyncRoute(aiController.analyzeSession));
 
 module.exports = router;

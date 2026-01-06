@@ -11,7 +11,7 @@ services:
     build: ./CentralServer
     container_name: trackr-central-dev
     environment:
-      - MONGO_URL=mongodb://mongo:27017
+      - MONGO_URL=mongodb://mongo:27017/trackrai
       - TRACKR_API_URL=http://trackr-api:4567/trackrapi
     ports:
       - "29000:9000"
@@ -19,7 +19,8 @@ services:
       - mongo
 
   trackr-api:
-    image: node:20
+    build: ./TrackrAPI
+    container_name: trackr-api-dev
     working_dir: /app
     volumes:
       - ./TrackrAPI:/app

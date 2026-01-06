@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import sessionService from '../services/session.service'
+import apiService from '../services/api.service'
 
 export const useSessionStore = defineStore('session', {
   state: () => ({
@@ -60,12 +61,9 @@ export const useSessionStore = defineStore('session', {
     },
 
     async fetchHistory() {
-      this.loading = true
-      try {
-        return await sessionService.history()
-      } finally {
-        this.loading = false
-      }
+      const res = await apiService.get('/session/history')
+      this.history = res.data.data
+      return this.history
     },
   },
 })

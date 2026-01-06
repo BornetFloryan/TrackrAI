@@ -6,7 +6,7 @@
 
     <template v-else>
       <div class="grid grid-3">
-        <StatCard title="Durée" :value="durationLabel" />
+        <StatCard title="Durée" :value="durationLabel" :sub="dureeSub" />
         <StatCard title="Distance" :value="distanceLabel" :sub="speedLabel" />
         <StatCard title="Stress" :value="stressLabel" :sub="stressSub" />
       </div>
@@ -42,9 +42,9 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useMeasureStore } from '../store/measure.store'
+import { useSessionStore } from '../store/session.store'
 import { buildGpsTrack, measuresOf } from '../utils/measureAdapters'
-import { haversineKm } from '../utils/geo'
-import { estimateSteps, estimateStress } from '../utils/physio'
+import { estimateStress } from '../utils/physio'
 
 import StatCard from '../components/StatCard.vue'
 import MeasureChart from '../components/MeasureChart.vue'
@@ -55,6 +55,7 @@ const props = defineProps({
 })
 
 const measureStore = useMeasureStore()
+const sessionStore = useSessionStore()
 const loading = ref(false)
 const measures = ref([])
 
@@ -63,7 +64,6 @@ const gpsPoints = ref([])
 onMounted(async () => {
   loading.value = true
   try {
-    // On ne peut pas filtrer serveur par session -> on prend 30 jours et on filtre client.
     const after = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
     const all = await measureStore.fetch(null, after, null)
     measures.value = all.filter(m => String(m.session) === String(props.sessionMongoId))
@@ -75,6 +75,12 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+const session = computed(() =>
+  sessionStore.history.find(s => s._id === props.sessionMongoId)
+)
+
+const stats = computed(() => session.value?.stats ?? null)
 
 const durationMs = computed(() => {
   if (!measures.value.length) return 0
@@ -89,13 +95,9 @@ const durationLabel = computed(() => {
   return `${m}m ${r}s`
 })
 
-const distanceKm = computed(() => {
-  if (gpsPoints.value.length < 2) return 0
-  let d = 0
-  for (let i = 1; i < gpsPoints.value.length; i++) d += haversineKm(gpsPoints.value[i - 1], gpsPoints.value[i])
-  return d
-})
-const distanceLabel = computed(() => `${distanceKm.value.toFixed(2)} km`)
+const distanceLabel = computed(() =>
+  stats.value ? `${stats.value.distanceKm.toFixed(2)} km` : '—'
+)
 
 const hrSeries = computed(() => measuresOf(measures.value, 'heart_rate').map(p => ({ date: new Date(p.date), value: p.value })))
 
@@ -111,13 +113,6 @@ const speedLabel = computed(() => {
   return `Vitesse moy.: ${avg.toFixed(1)} km/h`
 })
 
-const steps = computed(() => {
-  const ax = measuresOf(measures.value, 'acc_x')
-  const ay = measuresOf(measures.value, 'acc_y')
-  const az = measuresOf(measures.value, 'acc_z')
-  return estimateSteps(ax, ay, az)
-})
-
 const stress = computed(() => {
   const hrAvg = hrSeries.value.length ? hrSeries.value.reduce((a, b) => a + (b.value > 0 ? b.value : 0), 0) / Math.max(1, hrSeries.value.filter(x => x.value > 0).length) : null
   // rmssd dernier
@@ -131,6 +126,15 @@ const stress = computed(() => {
   return estimateStress({ rmssd, hr: hrAvg })
 })
 
-const stressLabel = computed(() => stress.value ?? '—')
-const stressSub = computed(() => `Pas estimés: ${steps.value}`)
+const stressLabel = computed(() =>
+  stats.value?.stress ?? '—'
+)
+const stressSub = computed(() =>
+  stats.value.steps ? `Pas estimés: ${stats.value.steps}` : ''
+)
+
+const dureeSub = computed(() =>
+  stats.value.score ? `Score: ${stats.value.score}` : ''
+)
+
 </script>

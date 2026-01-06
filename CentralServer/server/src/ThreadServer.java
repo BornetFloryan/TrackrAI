@@ -56,8 +56,10 @@ class ThreadServer extends Thread {
             try {
                 exchanger.getHttpDriver().moduleConnection(moduleKey, false);
             } catch (Exception e) {
-                System.err.println("Failed to update module connection=false on API");
-            }
+                System.out.println(
+                    "moduleConnection(false) ignored (module may not exist yet): " + moduleKey
+                );
+            }            
 
             System.out.println("Module disconnected: " + moduleKey);
         }
@@ -259,18 +261,30 @@ class ThreadServer extends Thread {
             ps.println("ERR invalid parameters");
             return;
         }
-
+    
         moduleKey = params[1];
-
+    
         ThreadServer previous = MainServer.modules.get(moduleKey);
         if (previous != null && previous != this) {
             previous.forceDisconnect("Replaced by new connection");
         }
-
+    
         MainServer.modules.put(moduleKey, this);
-
-        exchanger.getHttpDriver().moduleConnection(moduleKey, true);
-
+    
+        try {
+            String answer = exchanger.getHttpDriver().moduleConnection(moduleKey, true);
+            System.out.println("moduleConnection -> " + answer);
+            
+            if (answer != null && answer.startsWith("ERR")) {
+                ps.println("ERR INVALID_KEY");
+                forceDisconnect("invalid module key");
+                return;
+            }            
+        } catch (Exception e) {
+            System.out.println("API not ready for moduleConnection");
+        }
+    
+        System.out.println("HELLO from moduleKey=" + moduleKey);
         ps.println("OK");
     }
 

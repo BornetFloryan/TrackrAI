@@ -12,5 +12,5 @@ public interface DataDriver {
     public String autoRegisterModule(String uc, List<String> chipsets);
     // === SESSION CHECK ===
     public boolean isSessionActive(String sessionId);
-    public void moduleConnection(String moduleKey, boolean connected);
+    public String moduleConnection(String moduleKey, boolean connected);
 }
