@@ -1,10 +1,12 @@
 <template>
   <header class="app-header" :class="{ sticky: isSticky }">
     <div class="inner">
-      <router-link v-if="isSportif" to="/dashboard" class="brand">
+
+      <router-link v-if="isAuthenticated" :to="homeRoute" class="brand">
         <span class="logo"></span>
         <span class="title">TrackrAI</span>
       </router-link>
+
 
       <nav class="nav" :aria-expanded="menuOpen">
         <button class="burger" @click="menuOpen = !menuOpen" :aria-label="menuOpen ? 'Fermer' : 'Ouvrir'">
@@ -12,43 +14,66 @@
         </button>
 
         <div class="links" :class="{ open: menuOpen }">
-          <router-link v-if="isSportif" class="link" to="/dashboard">Dashboard</router-link>
 
           <!-- SPORTIF -->
-          <router-link v-if="isSportif" class="link" to="/session/start">
-            Nouvelle séance
-          </router-link>
+          <template v-if="isSportif">
+            <router-link class="link" to="/dashboard">Dashboard</router-link>
 
-          <router-link v-if="isSportif" class="link" to="/sessions">
-            Historique
-          </router-link>
+            <router-link class="link" to="/session/start">
+              Nouvelle séance
+            </router-link>
+
+            <router-link class="link" to="/sessions">
+              Historique
+            </router-link>
+          </template>
 
           <!-- COACH -->
-          <router-link v-if="isCoach" class="link" to="/coach">
-            Coach
-          </router-link>
+          <template v-if="isCoach">
+            <router-link class="link" to="/coach">
+              Coach
+            </router-link>
+
+            <router-link class="link" to="/coach/athletes">
+              Sportifs
+            </router-link>
+          </template>
+
+          <!-- SPORTIF ET COACH -->
+          <template v-if="isSportif || isCoach">
+            <router-link class="link" to="/mobile/video">
+              Vidéo (mobile)
+            </router-link>
+          </template>
 
           <!-- ADMIN -->
-          <router-link v-if="isAdmin" class="link" to="/admin">
-            Admin
-          </router-link>
+          <template v-if="isAdmin">
+            <router-link class="link" to="/admin">
+              Administration
+            </router-link>
+          </template>
 
-          <!-- MOBILE -->
-          <router-link v-if="isSportif" class="link" to="/mobile/video">
-            Vidéo (mobile)
-          </router-link>
+
         </div>
-
       </nav>
 
       <div class="right">
-        <span v-if="isAuthenticated" class="badge">👤 {{ displayName }}</span>
-        <button v-if="isAuthenticated" class="secondary" @click="logout">Déconnexion</button>
-        <router-link v-else class="badge" to="/login">Se connecter</router-link>
+        <span v-if="isAuthenticated" class="badge">
+          👤 {{ displayName }}
+        </span>
+
+        <button v-if="isAuthenticated" class="secondary" @click="logout">
+          Déconnexion
+        </button>
+
+        <router-link v-else class="badge" to="/login">
+          Se connecter
+        </router-link>
       </div>
     </div>
   </header>
 </template>
+
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
@@ -76,6 +101,13 @@ function logout() {
 function onScroll() {
   isSticky.value = window.scrollY > 8
 }
+
+const homeRoute = computed(() => {
+  if (isSportif.value) return '/dashboard'
+  if (isCoach.value) return '/coach'
+  if (isAdmin.value) return '/admin'
+  return '/login'
+})
 
 onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
 onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))

@@ -44,7 +44,8 @@
         Aucune séance trouvée sur la période.
       </div>
 
-      <div v-for="s in sessions" :key="s._id" class="card">
+      <div v-for="s in sessions" :key="s._id" class="card clickable">
+
         <div style="display:flex; justify-content:space-between; gap:.75rem; flex-wrap:wrap;">
           <div>
             <div style="font-weight:900; font-size:1.05rem;">
@@ -64,7 +65,7 @@
           </div>
         </div>
 
-        <hr class="hr"/>
+        <hr class="hr" />
 
         <router-link :to="`/sessions/${s._id}`">
           Voir le détail →
@@ -75,55 +76,54 @@
 </template>
 
 <script setup>
-  import { ref, onMounted } from 'vue'
-  import { storeToRefs } from 'pinia'
-  import { useSessionStore } from '../store/session.store'
-  import { useModuleStore } from '../store/module.store'
-  
-  const sessionStore = useSessionStore()
-  const moduleStore = useModuleStore()
-  const { modules } = storeToRefs(moduleStore)
-  
-  const days = ref(7)
-  const moduleKey = ref('')
-  const loading = ref(false)
-  const sessions = ref([])
-  
-  onMounted(async () => {
-    await moduleStore.fetch()
-    await reload()
-  })
-  
-  async function reload() {
-    loading.value = true
-    try {
-      let list = await sessionStore.fetchHistory()
-  
-      const minDate = Date.now() - days.value * 24 * 3600 * 1000
-      list = list.filter(s => new Date(s.startDate).getTime() >= minDate)
-  
-      if (moduleKey.value) {
-        list = list.filter(s => s.module?.key === moduleKey.value)
-      }
-  
-      sessions.value = list
-    } finally {
-      loading.value = false
+import { ref, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useSessionStore } from '../store/session.store'
+import { useModuleStore } from '../store/module.store'
+
+const sessionStore = useSessionStore()
+const moduleStore = useModuleStore()
+const { modules } = storeToRefs(moduleStore)
+
+const days = ref(7)
+const moduleKey = ref('')
+const loading = ref(false)
+const sessions = ref([])
+
+onMounted(async () => {
+  await moduleStore.fetch()
+  await reload()
+})
+
+async function reload() {
+  loading.value = true
+  try {
+    let list = await sessionStore.fetchHistory()
+
+    const minDate = Date.now() - days.value * 24 * 3600 * 1000
+    list = list.filter(s => new Date(s.startDate).getTime() >= minDate)
+
+    if (moduleKey.value) {
+      list = list.filter(s => s.module?.key === moduleKey.value)
     }
+
+    sessions.value = list
+  } finally {
+    loading.value = false
   }
-  
-  function formatDate(d) {
-    return new Date(d).toLocaleString()
-  }
-  function formatDuration(ms = 0) {
-    const s = Math.floor(ms / 1000)
-    return `${Math.floor(s / 60)}m ${s % 60}s`
-  }
-  function fmt(v) {
-    return v == null ? '—' : Math.round(v)
-  }
-  function fmtKm(v) {
-    return (v ?? 0).toFixed(2)
-  }
-  </script>
-  
+}
+
+function formatDate(d) {
+  return new Date(d).toLocaleString()
+}
+function formatDuration(ms = 0) {
+  const s = Math.floor(ms / 1000)
+  return `${Math.floor(s / 60)}m ${s % 60}s`
+}
+function fmt(v) {
+  return v == null ? '—' : Math.round(v)
+}
+function fmtKm(v) {
+  return (v ?? 0).toFixed(2)
+}
+</script>

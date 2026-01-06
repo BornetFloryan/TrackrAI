@@ -1,6 +1,12 @@
 <template>
   <div class="page">
     <h1>Détail séance</h1>
+    <div class="card" style="margin-bottom:1rem; display:flex; justify-content:flex-start;">
+      <button class="secondary" @click="goBack">
+        ← Retour
+      </button>
+    </div>
+
 
     <div class="card" v-if="loading">Chargement…</div>
 
@@ -78,10 +84,13 @@ import { useMeasureStore } from '../store/measure.store'
 import { useSessionStore } from '../store/session.store'
 import { buildGpsTrack, measuresOf } from '../utils/measureAdapters'
 import { estimateStress } from '../utils/physio'
+import { useRouter } from 'vue-router'
 
 import StatCard from '../components/StatCard.vue'
 import MeasureChart from '../components/MeasureChart.vue'
 import GpsMap from '../components/GpsMap.vue'
+
+const router = useRouter()
 
 const props = defineProps({
   sessionMongoId: { type: String, required: true }
@@ -176,4 +185,11 @@ const dureeSub = computed(() =>
   stats.value.score.global ? `Score: ${stats.value.score.global.toFixed(2)}` : ''
 )
 
+function goBack() {
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push('/dashboard')
+  }
+}
 </script>

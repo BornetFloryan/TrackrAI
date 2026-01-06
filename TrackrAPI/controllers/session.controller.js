@@ -12,6 +12,8 @@ const tcpService = require("../services/tcp.service");
 const Measure = require('../models/measure.model')
 const { computeSessionStats } = require('../utils/sessionStats')
 
+const { maybeRetrain } = require("../ai/maybeRetrain");
+
 
 const start = async (req, res, next) => {
   answer.reset();
@@ -146,9 +148,11 @@ const stop = async (req, res, next) => {
   session.stats = stats
   session.endDate = new Date()
   await session.save()
+  
+  await maybeRetrain()
 
   try {
-    const script = path.join(__dirname, '..', 'python', 'predict_session.py')
+    const script = path.join(__dirname, 'ai', 'predict_session.py');
     const out = spawnSync('python3', [script, String(session.sessionId)], {
       encoding: 'utf-8',
       env: process.env,
@@ -156,7 +160,10 @@ const stop = async (req, res, next) => {
 
     if (out.status === 0 && out.stdout) {
       const ai = JSON.parse(out.stdout)
-      session.stats.aiScore = ai.aiScore
+      if (ai?.global != null && session.stats?.score) {
+        session.stats.score.global = ai.global
+        session.stats.score.confidence = 0.6
+      }
       session.stats.aiExplain = ai.explain
       await session.save()
     }

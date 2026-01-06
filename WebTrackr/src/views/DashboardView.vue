@@ -15,7 +15,7 @@
         </div>
 
         <div style="display:flex; align-items:flex-end;">
-          <button @click="reload" :disabled="loading">Analyser</button>
+          <button @click="reload" :disabled="loading">Filtrer</button>
         </div>
       </div>
 
@@ -35,14 +35,51 @@
         <StatCard title="HR moyenne" :value="hrAvgLabel" :sub="`HR max: ${hrMaxLabel}`" />
         <StatCard title="Stress moyen" :value="stressAvgLabel" :sub="`Pas totaux: ${stepsTotalLabel}`" />
       </div>
+      <div v-if="globalInsight" class="grid grid-3" style="margin-top:1rem;">
+        <div class="card">
+          <h4>Profil global – Score</h4>
+          <p class="muted">
+            Score moyen :
+            <strong>{{ globalInsight.avgScore.toFixed(1) }}</strong>
+          </p>
+        </div>
 
-      <div class="card" style="margin-top:1rem;height:320px;">
-        <h3 style="margin:0 0 .5rem 0;">Performance des séances</h3>
+        <div class="card">
+          <h4>Charge & Intensité</h4>
+          <ul class="muted">
+            <li>Charge : {{ globalInsight.load.toFixed(1) }}</li>
+            <li>Intensité : {{ globalInsight.intensity.toFixed(1) }}</li>
+          </ul>
+        </div>
 
-        <Line v-if="chartData.datasets[0].data.length" :data="chartData" :options="chartOptions" />
-
-        <p v-else style="color:var(--muted)">Aucune séance sur la période.</p>
+        <div class="card">
+          <h4>Récupération</h4>
+          <p class="muted">{{ globalInsight.recovery.toFixed(1) }}</p>
+          <p class="muted">
+            <em>
+              {{
+                globalInsight.intensity > globalInsight.recovery
+                  ? 'Attention à la récupération'
+                  : 'Profil équilibré'
+              }}
+            </em>
+          </p>
+        </div>
       </div>
+
+
+      <div class="card" style="margin-top:1rem;">
+        <label>Métrique affichée</label>
+        <select v-model="metric">
+          <option value="score">Score global</option>
+          <option value="distanceKm">Distance (km)</option>
+          <option value="hrAvg">FC moyenne</option>
+          <option value="stress">Stress</option>
+        </select>
+      </div>
+
+      <MetricLineChart v-if="sessions.length" :sessions="sessions" :metric="metric" :metrics="METRICS" />
+
       <div class="card" style="margin-top:1rem;" v-if="globalGpsPoints.length">
         <h3 style="margin:0 0 .5rem 0;">Tracés GPS cumulés</h3>
         <GpsMap :points="globalGpsPoints" />
@@ -102,23 +139,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Line } from 'vue-chartjs'
-import {
-  Chart as ChartJS,
-  LineElement,
-  PointElement,
-  LinearScale,
-  CategoryScale,
-  Tooltip
-} from 'chart.js'
-
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip)
 
 import { useModuleStore } from '../store/module.store'
 import { useSessionStore } from '../store/session.store'
 
 import StatCard from '../components/StatCard.vue'
 import GpsMap from '../components/GpsMap.vue'
+import MetricLineChart from '../components/MetricLineChart.vue'
 
 const router = useRouter()
 const moduleStore = useModuleStore()
@@ -128,6 +155,33 @@ const days = ref(7)
 const loading = ref(false)
 const sessions = ref([])
 const globalGpsPoints = ref([])
+const metric = ref('score')
+
+const METRICS = {
+  score: {
+    label: 'Score global',
+    get: s => s.score,
+    min: 0,
+    max: 100
+  },
+  distanceKm: {
+    label: 'Distance (km)',
+    get: s => s.distanceKm,
+    min: 0
+  },
+  hrAvg: {
+    label: 'FC moyenne (bpm)',
+    get: s => s.hrAvg,
+    min: 60,
+    max: 200
+  },
+  stress: {
+    label: 'Stress',
+    get: s => s.stress,
+    min: 0,
+    max: 100
+  }
+}
 
 onMounted(async () => {
   await moduleStore.fetch()
@@ -148,13 +202,16 @@ async function reload() {
     sessions.value = list.map(s => ({
       sessionMongoId: s._id,
       start: s.startDate,
+      stats: s.stats,
       distanceKm: s.stats?.distanceKm,
       hrAvg: s.stats?.hrAvg,
       hrMax: s.stats?.hrMax,
       steps: s.stats?.steps,
       stress: s.stats?.stress,
-      score: s.stats?.aiScore?.global ?? s.stats?.score?.global ?? null,
+
+      score: s.stats?.score?.global ?? null,
     }))
+
 
 
     globalGpsPoints.value = []
@@ -216,5 +273,33 @@ const chartOptions = {
     }
   }
 }
+const globalInsight = computed(() => {
+  const list = sessions.value.filter(
+    s => s.stats?.score?.components
+  )
 
+  if (!list.length) return null
+
+  let avgScore = 0
+  let load = 0
+  let intensity = 0
+  let recovery = 0
+
+  for (const s of list) {
+    const c = s.stats.score.components
+    avgScore += s.stats.score.global
+    load += c.load
+    intensity += c.intensity
+    recovery += c.recovery
+  }
+
+  const n = list.length
+
+  return {
+    avgScore: avgScore / n,
+    load: load / n,
+    intensity: intensity / n,
+    recovery: recovery / n
+  }
+})
 </script>

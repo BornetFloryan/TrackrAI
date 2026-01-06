@@ -1,72 +1,72 @@
-import os, json
-import pandas as pd
+import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
-from joblib import dump
+import pandas as pd
 from xgboost import XGBRegressor
+from joblib import dump
 
 load_dotenv()
 
 MONGO = os.getenv("MONGODB_URL", "mongodb://mongo:27017/trackrapi")
-MODEL_PATH = os.getenv("AI_MODEL_PATH", "/app/python/model.joblib")
+OUTPUT = os.getenv("AI_MODEL_PATH", "/app/ai/model.joblib")
 
-FEATURES = ["durationMs", "distanceKm", "steps", "hrAvg", "hrMax", "stress", "rmssd"]
+FEATURES = [
+    "distanceKm",
+    "hrAvg",
+    "stress",
+    "durationMs",
+    "steps"
+]
 
 def main():
     client = MongoClient(MONGO)
     db = client.get_default_database()
-    sessions = list(db["sessions"].find({"endDate": {"$exists": True}, "stats": {"$exists": True}}))
+
+    sessions = list(db.sessions.find({
+        "stats.score.global": {"$exists": True}
+    }))
+
+    if len(sessions) < 10:
+        print("Not enough data to train model")
+        return
 
     rows = []
+
     for s in sessions:
-        st = s.get("stats") or {}
-        score = (st.get("score") or {}).get("global", None)
+        st = s.get("stats", {})
+        score = st.get("score", {}).get("global")
         if score is None:
             continue
 
-        row = {f: st.get(f, None) for f in FEATURES}
-        row["y"] = score
-        rows.append(row)
+        rows.append({
+            "distanceKm": st.get("distanceKm", 0),
+            "hrAvg": st.get("hrAvg", 0),
+            "stress": st.get("stress", 0),
+            "durationMs": st.get("durationMs", 0),
+            "steps": st.get("steps", 0),
+            "target": score
+        })
 
-    if len(rows) < 5:
-        print(json.dumps({
-            "ok": False,
-            "message": "Pas assez de données pour entraîner (min 5 sessions finies avec stats.score.global).",
-            "n": len(rows)
-        }))
-        return
-
-    df = pd.DataFrame(rows).dropna()
-    if len(df) < 5:
-        print(json.dumps({
-            "ok": False,
-            "message": "Après nettoyage (NaN), pas assez de lignes.",
-            "n": int(len(df))
-        }))
-        return
-
+    df = pd.DataFrame(rows)
     X = df[FEATURES]
-    y = df["y"]
+    y = df["target"]
 
     model = XGBRegressor(
-        n_estimators=250,
+        n_estimators=120,
         max_depth=4,
-        learning_rate=0.06,
-        subsample=0.9,
-        colsample_bytree=0.9,
-        random_state=42
+        learning_rate=0.08,
+        objective="reg:squarederror"
     )
+
     model.fit(X, y)
 
-    dump({"model": model, "features": FEATURES}, MODEL_PATH)
+    dump({
+        "model": model,
+        "features": FEATURES,
+        "samples": len(df)
+    }, OUTPUT)
 
-    print(json.dumps({
-        "ok": True,
-        "message": "Modèle entraîné et sauvegardé",
-        "modelPath": MODEL_PATH,
-        "nTrain": int(len(df)),
-        "features": FEATURES
-    }))
+    print(f"[AI] Model trained ({len(df)} samples)")
 
 if __name__ == "__main__":
     main()

@@ -5,7 +5,7 @@ const { answer } = require('./ControllerAnswer')
 
 const trainModel = async (req, res) => {
   answer.reset()
-  const script = path.join(__dirname, '..', 'python', 'train_model.py')
+  const script = path.join(__dirname, '..', 'ai', 'train_model.py')
   const out = spawnSync('python3', [script], { encoding: 'utf-8', env: process.env })
 
   if (out.status !== 0) {
@@ -28,7 +28,7 @@ const predictForSession = async (req, res) => {
     return res.status(404).send(answer)
   }
 
-  const script = path.join(__dirname, '..', 'python', 'predict_session.py')
+  const script = path.join(__dirname, 'ai', 'predict_session.py');
   const out = spawnSync('python3', [script, String(sessionId)], { encoding: 'utf-8', env: process.env })
 
   if (out.status !== 0) {

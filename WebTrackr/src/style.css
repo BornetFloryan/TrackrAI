@@ -103,3 +103,27 @@ button:disabled{
   background: var(--border);
   margin: 1rem 0;
 }
+
+.card.clickable {
+  cursor: pointer;
+  transition: all .18s ease;
+}
+
+.card.clickable:hover {
+  transform: translateY(-2px);
+  border-color: rgba(110, 231, 255, .6);
+  box-shadow: 0 10px 32px rgba(110, 231, 255, .14);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.input {
+  width: 100%;
+  padding: .75rem .85rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(3,8,18,.55);
+  color: var(--text);
+}

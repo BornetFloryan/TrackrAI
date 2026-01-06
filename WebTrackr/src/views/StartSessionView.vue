@@ -193,7 +193,6 @@ async function fetchMeasures() {
   const az = measuresOf(list, 'acc_z')
   stepsValue.value = estimateSteps(ax, ay, az)
 
-  console.log("rmssd : ", lastRmssd.value, ", hr : ", lastHr.value)
   stressValue.value = estimateStress({ rmssd: lastRmssd.value, hr: lastHr.value })
 }
 

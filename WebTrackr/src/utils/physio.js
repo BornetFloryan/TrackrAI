@@ -1,75 +1,97 @@
 export function movingAverage(series, window = 5) {
   return series.map((p, i, arr) => {
-    const slice = arr.slice(Math.max(0, i - window + 1), i + 1)
-    const avg = slice.reduce((s, x) => s + x.value, 0) / slice.length
-    return { ...p, value: avg }
-  })
+    const slice = arr.slice(Math.max(0, i - window + 1), i + 1);
+    const avg = slice.reduce((s, x) => s + x.value, 0) / slice.length;
+    return { ...p, value: avg };
+  });
 }
 
-// Pas estimés: détection de pics sur magnitude d'accélération
-export function estimateSteps(accX, accY, accZ, threshold = 16000) {
-  accX = movingAverage(accX)
-  accY = movingAverage(accY)
-  accZ = movingAverage(accZ)
+export function estimateSteps(accX, accY, accZ) {
+  accX = movingAverage(accX, 5);
+  accY = movingAverage(accY, 5);
+  accZ = movingAverage(accZ, 5);
+  accX = removeGravity(accX);
+  accY = removeGravity(accY);
+  accZ = removeGravity(accZ);
 
-  const merged = mergeByTime(accX, accY, accZ)
-  if (merged.length < 5) return 0
+  const merged = mergeByTime(accX, accY, accZ);
+  if (merged.length < 10) return 0;
 
-  let steps = 0
-  let above = false
+  let steps = 0;
+  let above = false;
+  let lastStepT = 0;
+
+  const THRESHOLD = 250;
 
   for (const p of merged) {
-    const mag = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z)
+    const mag = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
 
-    if (!above && mag > threshold) {
-      steps++
-      above = true
+    if (!above && mag > THRESHOLD && p.t - lastStepT > 300) {
+      steps++;
+      lastStepT = p.t;
+      above = true;
     }
-    if (above && mag < threshold * 0.85) {
-      above = false
+
+    if (above && mag < THRESHOLD * 0.6) {
+      above = false;
     }
   }
 
-  return steps
+  return steps;
 }
 
 function mergeByTime(x, y, z) {
-  const map = new Map()
-  for (const p of x) { map.set(p.date, { t:p.date, x:p.value }) }
+  const map = new Map();
+  for (const p of x) {
+    map.set(p.date, { t: p.date, x: p.value });
+  }
   for (const p of y) {
-    const o = map.get(p.date) || { t:p.date }
-    o.y = p.value
-    map.set(p.date, o)
+    const o = map.get(p.date) || { t: p.date };
+    o.y = p.value;
+    map.set(p.date, o);
   }
   for (const p of z) {
-    const o = map.get(p.date) || { t:p.date }
-    o.z = p.value
-    map.set(p.date, o)
+    const o = map.get(p.date) || { t: p.date };
+    o.z = p.value;
+    map.set(p.date, o);
   }
   return [...map.values()]
-    .filter(o => Number.isFinite(o.x) && Number.isFinite(o.y) && Number.isFinite(o.z))
-    .sort((a,b)=>a.t-b.t)
-    .map(o => ({ t:o.t, x:o.x, y:o.y, z:o.z }))
+    .filter(
+      (o) =>
+        Number.isFinite(o.x) && Number.isFinite(o.y) && Number.isFinite(o.z)
+    )
+    .sort((a, b) => a.t - b.t)
+    .map((o) => ({ t: o.t, x: o.x, y: o.y, z: o.z }));
 }
 
 export function estimateStress({ rmssd, hr }) {
   if (Number.isFinite(rmssd) && rmssd > 0) {
-    const ln = Math.log(rmssd)
+    const ln = Math.log(rmssd);
 
-    const LN_LOW  = Math.log(15)
-    const LN_HIGH = Math.log(60)
+    const LN_LOW = Math.log(15);
+    const LN_HIGH = Math.log(60);
 
-    const x = clamp((LN_HIGH - ln) / (LN_HIGH - LN_LOW), 0, 1)
+    const x = clamp((LN_HIGH - ln) / (LN_HIGH - LN_LOW), 0, 1);
 
-    return Math.round(20 + x * 60)
+    return Math.round(20 + x * 60);
   }
 
   if (Number.isFinite(hr) && hr > 0) {
-    const x = clamp((hr - 60) / 60, 0, 1)
-    return Math.round(30 + x * 50)
+    const x = clamp((hr - 60) / 60, 0, 1);
+    return Math.round(30 + x * 50);
   }
 
-  return null
+  return null;
 }
 
-function clamp(v,a,b){ return Math.max(a, Math.min(b,v)) }
+function clamp(v, a, b) {
+  return Math.max(a, Math.min(b, v));
+}
+
+function removeGravity(series, alpha = 0.9) {
+  let g = 0;
+  return series.map((p) => {
+    g = alpha * g + (1 - alpha) * p.value;
+    return { ...p, value: p.value - g };
+  });
+}

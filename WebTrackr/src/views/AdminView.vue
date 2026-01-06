@@ -3,9 +3,6 @@
     <h1>Administration</h1>
 
     <div class="grid grid-2">
-      <!-- =========================
-           UTILISATEURS
-      ========================== -->
       <div class="card">
         <h3>Utilisateurs</h3>
 
@@ -40,17 +37,17 @@
           </tbody>
         </table>
 
-        <!-- AJOUT UTILISATEUR -->
         <hr style="margin:1rem 0" />
         <h4>Ajouter un utilisateur</h4>
 
         <div class="form-row">
-          <input v-model="newUser.login" placeholder="Login" />
-          <input v-model="newUser.email" placeholder="Email" />
+          <input v-model="newUser.login" placeholder="Login" required/>
+          <input v-model="newUser.email" placeholder="Email" required/>
           <input
             v-model="newUser.password"
             type="password"
             placeholder="Mot de passe"
+            required
           />
           <select v-model="newUser.role">
             <option value="basic">Sportif</option>
@@ -70,9 +67,6 @@
         <p v-if="userError" class="error">{{ userError }}</p>
       </div>
 
-      <!-- =========================
-           MODULES ESP
-      ========================== -->
       <div class="card">
         <h3>Modules ESP32</h3>
 
@@ -98,14 +92,13 @@
           </tbody>
         </table>
 
-        <!-- AJOUT MODULE -->
         <hr style="margin:1rem 0" />
         <h4>Ajouter un module</h4>
 
         <div class="form-row">
-          <input v-model="newModule.name" placeholder="Nom" />
-          <input v-model="newModule.uc" placeholder="UC" />
-          <input v-model="newModule.key" placeholder="Clé ESP" />
+          <input v-model="newModule.name" placeholder="Nom" required/>
+          <input v-model="newModule.uc" placeholder="UC" required/>
+          <input v-model="newModule.key" placeholder="Clé ESP" required/>
         </div>
 
         <button
@@ -129,24 +122,15 @@ import { storeToRefs } from 'pinia'
 import { useUserStore } from '../store/user.store'
 import { useModuleStore } from '../store/module.store'
 
-/* =========================
-   STORES
-========================= */
 const userStore = useUserStore()
 const moduleStore = useModuleStore()
 
 const { users } = storeToRefs(userStore)
 const { modules } = storeToRefs(moduleStore)
 
-/* =========================
-   LOADERS
-========================= */
 const usersLoading = ref(false)
 const modulesLoading = ref(false)
 
-/* =========================
-   FETCH INITIAL
-========================= */
 onMounted(async () => {
   usersLoading.value = true
   modulesLoading.value = true
@@ -157,18 +141,12 @@ onMounted(async () => {
   ])
 })
 
-/* =========================
-   BADGES
-========================= */
 function badgeClass(role) {
   if (role === 'admin') return 'badge-danger'
   if (role === 'coach') return 'badge-warning'
   return 'badge-success'
 }
 
-/* =========================
-   AJOUT UTILISATEUR
-========================= */
 const newUser = ref({
   login: '',
   email: '',
@@ -213,9 +191,6 @@ async function createUser() {
   }
 }
 
-/* =========================
-   AJOUT MODULE
-========================= */
 const newModule = ref({
   name: '',
   uc: '',
