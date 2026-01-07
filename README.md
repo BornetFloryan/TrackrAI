@@ -159,4 +159,3 @@ Projet réalisé dans le cadre d’une SAE de Semestre 5 par :
 - En développement, le frontend consomme directement l’API exposée par Docker
 - En production, les accès API et WebSocket sont gérés via un reverse proxy Nginx
 - Le mode mobile en développement repose sur un affichage du frontend Vite en live
-```
