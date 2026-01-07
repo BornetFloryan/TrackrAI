@@ -112,8 +112,6 @@ const create = async function (req, res, next) {
     return res.status(200).send(answer);
   }
 
-  console.log("req.body", req.body);
-
   const m = {
     type: req.body.type,
     date: req.body.date,

@@ -8,7 +8,6 @@ function computePerformanceScore({ durationMs, distanceKm, hrAvg, stress, rmssd 
   const hr = Number.isFinite(hrAvg) ? hrAvg : null
   const st = Number.isFinite(stress) ? stress : null
 
-
   const load = clamp((dist / Math.max(0.01, durMin / 60)) * 12, 0, 100)
   const intensity = hr == null ? null : clamp(((hr - 80) / (180 - 80)) * 100, 0, 100)
   const recovery = st == null ? null : clamp(100 - st, 0, 100)

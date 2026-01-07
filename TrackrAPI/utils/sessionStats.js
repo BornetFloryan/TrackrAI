@@ -70,8 +70,7 @@ function computeSessionStats(measures) {
     hrMax,
     stress,
     rmssd,
-    score,
-    aiScore: null,
+    score
   }
 }
 
