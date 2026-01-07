@@ -2,7 +2,7 @@
 
 TrackrAI est une application de suivi et d’analyse de mouvements sportifs basée sur l’analyse vidéo.
 L’objectif est de permettre à un utilisateur de déposer une vidéo d’un mouvement (ex. squat) et d’obtenir
-un retour automatique (score, erreurs biomécaniques, conseils).
+un retour automatique (score, erreurs biomécaniques, conseils). 
 
 Le projet repose sur une architecture distribuée composée :
 - d’un frontend web/mobile hybride
