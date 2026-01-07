@@ -147,7 +147,7 @@ Projet réalisé dans le cadre d’une SAE de Semestre 5 par :
 
 - Floryan Bornet  
 - Corentin Brendle  
-- Gauthier Wable  
+- Gauthier Weibel 
 - Ludovic Ertzer  
 - Simon Bonnin  
 
