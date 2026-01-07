@@ -49,7 +49,7 @@
         <div style="display:flex; justify-content:space-between; gap:.75rem; flex-wrap:wrap;">
           <div>
             <div style="font-weight:900; font-size:1.05rem;">
-              {{ formatDate(s.startDate) }} - Score {{ s.stats.score.global.toFixed(2) }}
+              {{ formatDate(s.startDate) }} - Score {{ s.stats?.score.global.toFixed(2) }}
             </div>
             <div class="muted" style="font-size:.9rem;">
               Durée: {{ formatDuration(s.stats?.durationMs) }}
