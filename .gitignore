@@ -153,3 +153,7 @@ pip-delete-this-directory.txt
 .env
 .env.*
 !.env.example
+
+# Windows junk
+*:Zone.Identifier
+git remote set-url origin git@github.com:BornetFloryan/trackrai.git
