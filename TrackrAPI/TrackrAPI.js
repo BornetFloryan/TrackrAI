@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const cors = require("cors");
 const trackrapiRouter = require('./routes/trackrapi.route'); // Imports routes
 const Config = require("./commons/config");
+const { initAI } = require("./ai/initAI");
 
 // extras imports
 const path = require('path');
@@ -56,13 +57,16 @@ mongoose.connect(mongoDB);
 mongoose.Promise = global.Promise;
 
 mongoose.connection.on('error', () => { console.error.bind(console, 'MongoDB connection error:')});
+mongoose.connection.once('open', async () => {
+  console.log('[DB] MongoDB connected');
+
+  const DbInit = require('./db.init');
+  await DbInit.initBdD();
+
+  initAI();
+});
 
 mongoose.set('useFindAndModify', false);
-
-// get the Right model to initialize Rights collection if it is empty
-const DbInint = require('./db.init');
-DbInint.initBdD()
-
 
 // define pre-processing: CORS, parsing JSON, ...
 
@@ -100,7 +104,6 @@ app.use((err, req, res, next) => {
     }
   }
 );
-
 
 // start server with SSL
 /*
