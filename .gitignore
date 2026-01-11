@@ -5,6 +5,7 @@ target/
 bin/
 *.class
 *.jar
+!lib/*.jar
 *.war
 *.ear
 
