@@ -1,7 +1,7 @@
 const net = require('net');
 
 const TCP_HOST = process.env.CENTRAL_HOST || '127.0.0.1';
-const TCP_PORT = Number(process.env.CENTRAL_PORT);
+const TCP_PORT = Number(process.env.CENTRAL_PORT || 29000);
 
 function sendToCentralServer(message) {
   return new Promise((resolve, reject) => {

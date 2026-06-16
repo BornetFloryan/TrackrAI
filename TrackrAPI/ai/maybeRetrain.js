@@ -1,5 +1,7 @@
 const { spawn } = require("child_process");
 const Session = require("../models/session.model");
+const { AI_DIR, PYTHON_EXECUTABLE } = require("../services/ai.service");
+const path = require("path");
 
 let retraining = false;
 
@@ -14,9 +16,10 @@ async function maybeRetrain() {
     retraining = true;
     console.log(`[AI] Retraining model (${count} sessions)`);
 
-    const p = spawn("python3", ["/app/ai/train_model.py"], {
+    const p = spawn(PYTHON_EXECUTABLE, [path.join(AI_DIR, "train_model.py")], {
       detached: true,
-      stdio: "ignore"
+      stdio: "ignore",
+      env: process.env,
     });
 
     p.unref();

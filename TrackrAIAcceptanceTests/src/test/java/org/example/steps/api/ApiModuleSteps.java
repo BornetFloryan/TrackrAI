@@ -27,6 +27,7 @@ public class ApiModuleSteps {
         URL url = new URL(WorldContext.api.baseUrl + "/module/get");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
+        conn.setRequestProperty("x-session-id", WorldContext.api.sessionToken);
 
         WorldContext.api.lastStatusCode = conn.getResponseCode();
         WorldContext.api.lastResponseBody = lire(conn);

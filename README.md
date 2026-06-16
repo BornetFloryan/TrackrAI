@@ -1,10 +1,11 @@
 # TrackrAI
 
-TrackrAI est une application de suivi et d’analyse de mouvements sportifs basée sur l’analyse vidéo.
-L’objectif est de permettre à un utilisateur de déposer une vidéo d’un mouvement (ex. squat) et d’obtenir
-un retour automatique (score, erreurs biomécaniques, conseils). 
+TrackrAI est un proof of concept de suivi sportif combinant un boitier ESP32, une application web/mobile,
+des statistiques de seance et une analyse video. Il fournit au sportif un suivi de ses mesures et au coach
+une vue globale des performances.
 
 Le projet repose sur une architecture distribuée composée :
+
 - d’un frontend web/mobile hybride
 - d’une API Node.js
 - d’un serveur central (Java)
@@ -18,6 +19,10 @@ Le projet repose sur une architecture distribuée composée :
 - Upload de vidéo depuis le frontend (web ou mobile)
 - Transmission de la vidéo via WebSocket
 - Analyse automatique du mouvement (ex. squat)
+- Acquisition GPS, inertielle et cardiaque par ESP32
+- Gestion des seances et calcul de statistiques
+- Prediction XGBoost et conseils de recuperation
+- Interfaces distinctes sportif, coach et administrateur
 - Retour immédiat :
   - score global
   - erreurs détectées
@@ -28,6 +33,7 @@ Le projet repose sur une architecture distribuée composée :
 ---
 
 ## 🧱 Architecture générale
+
 ```
 Frontend (Vue / Capacitor)
 │
@@ -49,6 +55,7 @@ Analyze Server (Python, WebSocket)
 │ WebSocket
 Frontend (upload vidéo)
 ```
+
 ---
 
 ## 🖥️ Technologies utilisées
@@ -96,14 +103,14 @@ Depuis la racine du dépôt :
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
-````
+```
 
 Les services exposés en développement sont :
 
-* Frontend (Vite) : [http://localhost:5173](http://localhost:5173)
-* API Trackr (Node.js) : [http://localhost:4567](http://localhost:4567)
-* Central Server (TCP) : port 29000
-* MongoDB : port 27017
+- Frontend (Vite) : [http://localhost:5173](http://localhost:5173)
+- API Trackr (Node.js) : [http://localhost:4567](http://localhost:4567)
+- Central Server (TCP) : port 29000
+- MongoDB : port 27017
 
 ### Arrêt des services
 
@@ -135,21 +142,15 @@ Aucune configuration spécifique à Docker ou à l’OS n’est nécessaire côt
 
 ---
 
-## 📚 Documentation
-
-- 📄 **Développement** : [`docs/DEV.md`](docs/DEV.md)
-
----
-
 ## 👥 Équipe
 
-Projet réalisé dans le cadre d’une SAE de Semestre 5 par :
+Projet réalisé dans le cadre d’une SAE par :
 
-- Floryan Bornet  
-- Corentin Brendle  
-- Gauthier Weibel 
-- Ludovic Ertzer  
-- Simon Bonnin  
+- Floryan Bornet
+- Corentin Brendle
+- Gauthier Weibel
+- Ludovic Ertzer
+- Simon Bonnin
 
 ---
 

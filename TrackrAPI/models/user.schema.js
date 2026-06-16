@@ -13,8 +13,9 @@ let UserSchema = new Schema({
   /* rights are
     admin : can do everything, adding µC modules, managing users, accessing data, ...
     basic : just see the stats
-   */
+  */
   rights: [ {type: String, enum: Config.rights }],
+  coach: { type: Schema.Types.ObjectId, ref: 'User' },
   sessionId: {type: String},
 },{versionKey: false});
 

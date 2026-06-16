@@ -1,7 +1,9 @@
 @ia
-Feature: Génération de conseils personnalisés par l'IA
+Feature: Prédiction du score de performance par l'IA
 
-  Scenario: Génération de recommandations après analyse
-    Given une séance existante avec l'identifiant "session-advice-1"
-    When je demande des conseils personnalisés par l'IA
-    Then le statut de la réponse IA doit être 404
+  Scenario: Prédiction documentée pour une séance existante
+    Given une séance existante avec l'identifiant "DEMO-TEST-1"
+    And je suis authentifié
+    When je demande la prédiction du score par l'IA
+    Then le statut de la réponse IA doit être 200
+    And une prédiction de performance est retournée

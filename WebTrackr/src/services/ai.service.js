@@ -1,9 +1,13 @@
-import api from './api'
+import api from './api.service'
 
 export async function trainModel() {
-  return api.post('/train')
+  return api.post('/ai/train')
 }
 
 export async function predictSession(sessionId) {
-  return api.get(`/predict/${sessionId}`)
+  return api.get(`/ai/predict/${sessionId}`)
+}
+
+export async function getSessionInsights(sessionId) {
+  return api.get(`/ai/insights/${sessionId}`)
 }

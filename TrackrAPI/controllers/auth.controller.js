@@ -65,7 +65,9 @@ const signIn = async function (req, res, next) {
   // check if name exists
   let user = null;
   try {
-    user = await User.findOne({login:req.body.login}).exec();
+    user = await User.findOne({login:req.body.login})
+      .populate('coach', '_id login email')
+      .exec();
     if (user === null) {
       answer.set(UserErrors.getError(UserErrors.ERR_USER_CANNOT_FIND_LOGIN))
       return next(answer);
@@ -81,6 +83,11 @@ const signIn = async function (req, res, next) {
     return next(answer);
   }
 
+  const coachInfo = user.coach ? {
+    _id: user.coach._id,
+    login: user.coach.login,
+    email: user.coach.email,
+  } : null;
 
   // here should add a jwt token creation, or something else
   // to provide a secure authentication for following requests
@@ -97,6 +104,9 @@ const signIn = async function (req, res, next) {
   }
 
   answer.setPayload({
+    userId: user._id,
+    login: user.login,
+    coach: coachInfo,
     rights: user.rights,
     token: sessionId,
   })
@@ -146,19 +156,25 @@ const onlyAdmin = async function(req, res, next) {
     answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_NOT_AUTHORIZED))
     return next(answer);
   }
-  for(let i=0;i<req.user.rights.length;i++) {
-    let r = req.user.rights[i];
-    if (r.startsWith("admin")) {
-      return next();
-    }
+  if (req.user.rights.includes("admin")) {
+    return next();
   }
   answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_INVALID_RIGHT))
   return next(answer);
 };
 
+const onlyAdminOrCoach = async function(req, res, next) {
+  answer.reset()
+  if (req.user?.rights?.some((right) => right === "admin" || right === "coach")) {
+    return next();
+  }
+  answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_INVALID_RIGHT))
+  return next(answer);
+};
 
 module.exports = {
   verifyToken,
   onlyAdmin,
+  onlyAdminOrCoach,
   signIn,
 };

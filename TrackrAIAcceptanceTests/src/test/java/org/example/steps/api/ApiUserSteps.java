@@ -7,6 +7,8 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
 public class ApiUserSteps {
 
     @When("je crée un utilisateur avec des données valides")
@@ -45,12 +47,19 @@ public class ApiUserSteps {
         WorldContext.api.lastResponseBody = lire(conn);
     }
 
+    @Then("aucun secret utilisateur n'est retourné")
+    public void aucun_secret_utilisateur() {
+        assertFalse(WorldContext.api.lastResponseBody.contains("\"password\""));
+        assertFalse(WorldContext.api.lastResponseBody.contains("\"sessionId\""));
+    }
+
     private void envoyer(String body) throws Exception {
         URL url = new URL(WorldContext.api.baseUrl + "/user/create");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("x-session-id", WorldContext.api.sessionToken);
         conn.setDoOutput(true);
 
         try (OutputStream os = conn.getOutputStream()) {

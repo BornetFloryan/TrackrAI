@@ -13,6 +13,7 @@ const Measure = require('../models/measure.model')
 const { computeSessionStats } = require('../utils/sessionStats')
 
 const { maybeRetrain } = require("../ai/maybeRetrain");
+const aiService = require("../services/ai.service");
 
 
 const start = async (req, res, next) => {
@@ -77,6 +78,9 @@ const start = async (req, res, next) => {
       return next(answer);
     }
   } catch (e) {
+    session.endDate = new Date();
+    await session.save();
+
     answer.set({
       error: 998,
       status: 503,
@@ -152,22 +156,17 @@ const stop = async (req, res, next) => {
   await maybeRetrain()
 
   try {
-    const script = path.join(__dirname, 'ai', 'predict_session.py');
-    const out = spawnSync('python3', [script, String(session.sessionId)], {
-      encoding: 'utf-8',
-      env: process.env,
-    })
-
-    if (out.status === 0 && out.stdout) {
-      const ai = JSON.parse(out.stdout)
-      if (ai?.global != null && session.stats?.score) {
-        session.stats.score.global = ai.global
-        session.stats.score.confidence = 0.6
-      }
+    const ai = aiService.predictSession(session.sessionId)
+    if (ai.ok && ai.global != null && session.stats?.score) {
+      session.stats.score.global = ai.global
+      session.stats.score.confidence = ai.confidence
       session.stats.aiExplain = ai.explain
+      session.stats.aiModel = ai.model
+      session.markModified('stats')
       await session.save()
     }
   } catch (e) {
+    console.error(`[AI] Prediction failed for session ${session.sessionId}:`, e.message)
   }
 
   answer.setPayload({ stopped: true })
@@ -230,9 +229,15 @@ const history = async (req, res, next) => {
   }
 
   const { _id, rights } = req.user
-  const filter = rights.includes('admin') || rights.includes('coach')
-    ? {}
-    : { user: _id }
+  let filter = { user: _id }
+
+  if (rights.includes('admin')) {
+    filter = {}
+  } else if (rights.includes('coach')) {
+    const User = require('../models/user.model')
+    const athletes = await User.find({ coach: _id }, '_id').lean().exec()
+    filter = { user: { $in: athletes.map((u) => u._id) } }
+  }
 
   const sessions = await Session.find(filter)
     .populate('module', 'name uc key')

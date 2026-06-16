@@ -164,6 +164,10 @@ const create = async function (req, res, next) {
     email: req.body.email,
   };
 
+  if (req.body.coach) {
+    u.coach = req.body.coach;
+  }
+
   User.create(u, async function(err, user) {
     if (err) {
       answer.set(UserErrors.getError(UserErrors.ERR_USER_INVALID_CREATE_REQUEST))
@@ -175,8 +179,13 @@ const create = async function (req, res, next) {
       return next(answer);
     }
     else {
-      // sends back the whole teacher
-      answer.data = user;
+      answer.data = {
+        _id: user._id,
+        login: user.login,
+        email: user.email,
+        rights: user.rights,
+        coach: user.coach,
+      };
       res.status(201).send(answer);
     }
   });
@@ -194,14 +203,13 @@ const create = async function (req, res, next) {
  */
 const update = async function (req, res, next) {
   answer.reset()
-  console.log('update user');
-  // sanity check on parameters
-  if (!checkData(req.body.data)) {
+  const { idUser, data } = req.body
+
+  if (!idUser || !checkData(data) || typeof data !== 'object' || Array.isArray(data)) {
     return next(answer);
   }
 
   let user = null
-  // check if user exists
   try {
     user = await User.findOne({_id:idUser}).exec();
     if (user === null) {
@@ -215,22 +223,31 @@ const update = async function (req, res, next) {
   }
 
   // if no password is given, keep the current one, otherwise encrypt the new one.
-  if ((req.body.data.password) && (req.body.data.password !== '')) {
-    // first encrypt password
+  const allowedFields = ['login', 'email', 'rights', 'password', 'coach']
+  const updates = Object.fromEntries(
+    Object.entries(data).filter(([key]) => allowedFields.includes(key))
+  )
+
+  if (updates.login !== undefined && !checkLogin(updates.login)) return next(answer)
+  if (updates.email !== undefined && !checkEmail(updates.email)) return next(answer)
+  if (updates.rights !== undefined && !checkRights(updates.rights)) return next(answer)
+
+  if (updates.password) {
     let password = '';
     try {
       const salt = await bcrypt.genSalt(SALT_WORK_FACTOR);
-      password = await bcrypt.hash(req.body.data.password, salt);
+      password = await bcrypt.hash(updates.password, salt);
     } catch (err) {
       answer.set(UserErrors.getError(UserErrors.ERR_USER_CANNOT_ENCRYPT_PASSWORD))
       return next(answer);
     }
-    req.body.data.password = password;
+    updates.password = password;
+  } else {
+    delete updates.password
   }
 
-  console.log('update user '+user._id+" with "+JSON.stringify(req.body.data));
   try {
-    user.set(req.body.data);
+    user.set(updates);
   }
   catch(err) {
     console.log("error while updating whole user");
@@ -243,8 +260,13 @@ const update = async function (req, res, next) {
       answer.set(UserErrors.getError(UserErrors.ERR_USER_CANNOT_UPDATE))
       return next(answer);
     }
-    // sends back the whole user
-    answer.data = user;
+    answer.data = {
+      _id: user._id,
+      login: user.login,
+      email: user.email,
+      rights: user.rights,
+      coach: user.coach,
+    };
     res.status(200).send(answer);
   });
 };
@@ -260,7 +282,18 @@ const getUsers = async function (req, res, next) {
   console.log('get users');
   let users = null
   try {
-    users = await User.find({},'_id login email rights').exec();
+    const filter = req.user.rights.includes('admin')
+      ? {}
+      : {
+          $or: [
+            { _id: req.user._id },
+            { rights: 'basic' },
+          ],
+        };
+
+    users = await User.find(filter, '_id login email rights coach')
+      .populate('coach', '_id login')
+      .exec();
   }
   catch(err) {
     answer.set(UserErrors.getError(UserErrors.ERR_USER_INVALID_FIND_USERS_REQUEST))

@@ -1,0 +1,61 @@
+services:
+  mongo:
+    image: mongo:6.0
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./TrackrAPI
+    environment:
+      MONGODB_URL: mongodb://mongo:27017/trackrai
+      PORT: 4567
+      CENTRAL_HOST: central
+      CENTRAL_PORT: 9000
+    ports:
+      - "4567:4567"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4567/trackrapi/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  central:
+    build: ./CentralServer
+    environment:
+      TRACKR_API_URL: http://api:4567/trackrapi
+      MONGO_URL: mongodb://mongo:27017/trackrai
+    ports:
+      - "29000:9000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  analyze:
+    build: ./AnalyzeServer
+    environment:
+      WS_HOST: 0.0.0.0
+      WS_PORT: 6000
+      CENTRAL_HOST: central
+      CENTRAL_PORT: 9000
+      CENTRAL_ENABLED: 1
+    ports:
+      - "6000:6000"
+    depends_on:
+      - central
+
+  frontend:
+    build:
+      context: ./WebTrackr
+      args:
+        VITE_API_BASE_URL: /trackrapi
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+      - analyze

@@ -3,6 +3,7 @@ import java.net.*;
 import java.net.http.*;
 import java.net.http.HttpResponse.*;
 import java.io.*;
+import java.time.Duration;
 import java.util.List;
 
 
@@ -13,7 +14,9 @@ public class HttpDataDriver implements DataDriver {
 
     public HttpDataDriver(String apiURL) {
         this.apiURL = apiURL;
-        client = HttpClient.newHttpClient();
+        client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
     }
 
     public boolean init() {
@@ -32,6 +35,7 @@ public class HttpDataDriver implements DataDriver {
         Document doc = null;
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(apiURL+route))
+                .timeout(Duration.ofSeconds(10))
                 .header("Content-Type", "application/json")
                 .method("POST",HttpRequest.BodyPublishers.ofString(payload))
                 .build();
@@ -42,24 +46,22 @@ public class HttpDataDriver implements DataDriver {
             doc = Document.parse(response.body());
         }
         catch(InterruptedException e) {
+            Thread.currentThread().interrupt();
             return null;
         }
         catch(IOException e) {
+            return null;
+        }
+        catch(RuntimeException e) {
             return null;
         }
         return doc;
     }
 
     public synchronized String autoRegisterModule(String uc, List<String> chipsets) {
-        String payload = "{\"uc\": \""+uc+"\", \"chipsets\": [";
-        String name = "";
-        String shortName = "";
-        String key = "";
-        int i = 0;
-        for(i=0;i<chipsets.size()-1;i++) {
-            payload += "\""+chipsets.get(i)+"\",";
-        }
-        payload += "\""+chipsets.get(i)+"\"]}";
+        String payload = new Document("uc", uc)
+                .append("chipsets", chipsets)
+                .toJson();
 
         Document doc = postRequest("/module/register", payload);
         if (doc == null) {
@@ -70,29 +72,31 @@ public class HttpDataDriver implements DataDriver {
         if (err != null) return err;
         // if not, get desired field in data
         Document data = (Document)doc.get("data");
-        name = data.getString("name");
-        shortName = data.getString("shortName");
-        key = data.getString("key");
+        String name = data.getString("name");
+        String shortName = data.getString("shortName");
+        String key = data.getString("key");
         return "OK "+name+","+shortName+","+key;
     }
 
     public synchronized  String saveMeasure(String type, String date, String value, String moduleKey, String sessionId) {
 
-        String payload =
-                "{"
-                        + "\"type\":\""+type+"\","
-                        + "\"date\":\""+date+"\","
-                        + "\"value\":\""+value+"\","
-                        + "\"moduleKey\":\""+moduleKey+"\","
-                        + "\"sessionId\":\""+sessionId+"\""
-                        + "}";
+        String payload = new Document("type", type)
+                .append("date", date)
+                .append("value", value)
+                .append("moduleKey", moduleKey)
+                .append("sessionId", sessionId)
+                .toJson();
 
         return sendMeasure(payload);
     }
 
     public synchronized String saveAnalysis(String type, String date, String value, String analysisId) {
 
-        String payload = "{\"type\": \""+type+"\", \"date\": \""+date+"\", \"value\": \""+value+"\"}";
+        String payload = new Document("type", type)
+                .append("date", date)
+                .append("value", value)
+                .append("analysisId", analysisId)
+                .toJson();
         return sendMeasure(payload);
     }
 
@@ -108,16 +112,18 @@ public class HttpDataDriver implements DataDriver {
 
     public synchronized boolean isSessionActive(String sessionId) {
 
-        String payload = "{\"sessionId\":\"" + sessionId + "\"}";
+        String payload = new Document("sessionId", sessionId).toJson();
         Document doc = postRequest("/session/active", payload);
 
         if (doc == null) return false;
-        return doc.getInteger("error") == 0;
+        Document data = doc.get("data", Document.class);
+        return doc.getInteger("error") == 0 && data != null && Boolean.TRUE.equals(data.getBoolean("active"));
     }
 
     public synchronized String moduleConnection(String moduleKey, boolean connected) {
-        String payload =
-            "{ \"moduleKey\": \"" + moduleKey + "\", \"connected\": " + connected + " }";
+        String payload = new Document("moduleKey", moduleKey)
+                .append("connected", connected)
+                .toJson();
     
         Document doc = postRequest("/module/connection", payload);
         if (doc == null) return "ERR cannot join the API";

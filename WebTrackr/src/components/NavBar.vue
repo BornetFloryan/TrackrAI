@@ -42,7 +42,10 @@
           <!-- SPORTIF ET COACH -->
           <template v-if="isSportif || isCoach">
             <router-link class="link" to="/mobile/video">
-              Vidéo (mobile)
+              Analyse vidéo
+            </router-link>
+            <router-link class="link" to="/analyses">
+              Analyses vidéo
             </router-link>
           </template>
 

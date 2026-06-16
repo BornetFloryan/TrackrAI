@@ -7,6 +7,8 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 public class ApiMeasureSteps {
 
     @When("j'envoie une mesure valide")
@@ -19,6 +21,14 @@ public class ApiMeasureSteps {
           "module": "invalid"
         }
         """);
+    }
+
+    @Then("la mesure est explicitement ignorée")
+    public void mesure_ignoree() {
+        assertTrue(
+                WorldContext.api.lastResponseBody.contains("\"ignored\":true"),
+                "La mesure sans session active doit être explicitement ignorée"
+        );
     }
 
     @When("j'envoie une mesure sans type")
@@ -37,9 +47,29 @@ public class ApiMeasureSteps {
         URL url = new URL(WorldContext.api.baseUrl + "/measure/get");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
+        conn.setRequestProperty("x-session-id", WorldContext.api.sessionToken);
 
         WorldContext.api.lastStatusCode = conn.getResponseCode();
         WorldContext.api.lastResponseBody = lire(conn);
+    }
+
+    @When("je demande les analyses vidéo")
+    public void demander_analyses_video() throws Exception {
+        URL url = new URL(WorldContext.api.baseUrl + "/analysis");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("x-session-id", WorldContext.api.sessionToken);
+
+        WorldContext.api.lastStatusCode = conn.getResponseCode();
+        WorldContext.api.lastResponseBody = lire(conn);
+    }
+
+    @Then("une liste d'analyses vidéo est retournée")
+    public void liste_analyses_video() {
+        assertTrue(
+                WorldContext.api.lastResponseBody.contains("\"data\":["),
+                "L'API doit retourner une enveloppe avec une liste d'analyses vidéo"
+        );
     }
 
     private void envoyer(String body) throws Exception {

@@ -1,6 +1,6 @@
 services:
   mongo:
-    image: mongo:4.4
+    image: mongo:6.0
     container_name: trackr-mongo
     restart: unless-stopped
     volumes:
@@ -15,7 +15,7 @@ services:
     environment:
       - MONGODB_URL=mongodb://mongo:27017/trackrai
       - PORT=4567
-      - CENTRAL_HOST=trackr-central
+      - CENTRAL_HOST=central
       - CENTRAL_PORT=9000
     ports:
       - "4567:4567"
@@ -28,8 +28,8 @@ services:
       - api
       - mongo
     environment:
-      - TRACKR_API_URL=http://trackr-api:4567/trackrapi
-      - MONGO_URL=mongodb://mongo:27017
+      - TRACKR_API_URL=http://api:4567/trackrapi
+      - MONGO_URL=mongodb://mongo:27017/trackrai
     ports:
       - "29000:9000"
 
@@ -40,7 +40,7 @@ services:
     depends_on:
       - central
     environment:
-      - CENTRAL_HOST=trackr-central
+      - CENTRAL_HOST=central
       - CENTRAL_PORT=9000
     ports:
       - "6000:6000"

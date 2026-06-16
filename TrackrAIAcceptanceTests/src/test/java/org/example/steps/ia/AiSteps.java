@@ -35,34 +35,27 @@ public class AiSteps {
 
     @When("je demande l'estimation de la fatigue par l'IA")
     public void demander_fatigue() throws Exception {
-        envoyer("/api/ai/fatigue", """
-        {
-          "sessionId": "%s"
-        }
-        """.formatted(sessionId));
+        envoyerGet("/ai/insights/" + sessionId);
     }
 
     @When("je demande l'analyse HRV par l'IA")
     public void demander_hrv() throws Exception {
-        envoyer("/api/ai/hrv", """
-        {
-          "sessionId": "%s"
-        }
-        """.formatted(sessionId));
+        envoyerGet("/ai/insights/" + sessionId);
     }
 
     @When("je demande des conseils personnalisés par l'IA")
     public void demander_conseils() throws Exception {
-        envoyer("/api/ai/advice", """
-        {
-          "sessionId": "%s"
-        }
-        """.formatted(sessionId));
+        envoyerGet("/ai/insights/" + sessionId);
     }
 
     @When("je lance l'entraînement du modèle IA")
     public void entrainer_modele() throws Exception {
-        envoyer("/api/ai/train", "{}");
+        envoyerPost("/ai/train", "{}");
+    }
+
+    @When("je demande la prédiction du score par l'IA")
+    public void demander_prediction() throws Exception {
+        envoyerGet("/ai/predict/" + sessionId);
     }
 
     // =======================
@@ -109,21 +102,42 @@ public class AiSteps {
         );
     }
 
+    @Then("une prédiction de performance est retournée")
+    public void prediction_retournee() {
+        assertTrue(
+                WorldContext.api.lastResponseBody.contains("\"global\"")
+                        && WorldContext.api.lastResponseBody.contains("\"model\""),
+                "Aucune prédiction documentée retournée"
+        );
+    }
+
     // =======================
     // ======= OUTILS ========
     // =======================
 
-    private void envoyer(String path, String body) throws Exception {
+    private void envoyerPost(String path, String body) throws Exception {
         URL url = new URL(WorldContext.api.baseUrl + path);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("x-session-id", WorldContext.api.sessionToken);
         conn.setDoOutput(true);
 
         try (OutputStream os = conn.getOutputStream()) {
             os.write(body.getBytes());
         }
+
+        WorldContext.api.lastStatusCode = conn.getResponseCode();
+        WorldContext.api.lastResponseBody = lire(conn);
+    }
+
+    private void envoyerGet(String path) throws Exception {
+        URL url = new URL(WorldContext.api.baseUrl + path);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("x-session-id", WorldContext.api.sessionToken);
 
         WorldContext.api.lastStatusCode = conn.getResponseCode();
         WorldContext.api.lastResponseBody = lire(conn);

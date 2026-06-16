@@ -56,6 +56,7 @@ venv/
 *.tar.gz
 *.rar
 *.7z
+artifacts/
 # --------------------------------------------------
 # Python
 # --------------------------------------------------
@@ -157,4 +158,3 @@ pip-delete-this-directory.txt
 
 # Windows junk
 *:Zone.Identifier
-git remote set-url origin git@github.com:BornetFloryan/trackrai.git

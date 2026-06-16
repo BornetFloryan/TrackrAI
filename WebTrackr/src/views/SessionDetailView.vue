@@ -145,7 +145,8 @@ const hrSeries = computed(() => measuresOf(measures.value, 'heart_rate').map(p =
 
 const speedSeriesKmH = computed(() =>
   measuresOf(measures.value, 'gps_speed')
-    .map(p => ({ date: new Date(p.date), value: p.value * 3.6 }))
+    .map(p => ({ date: new Date(p.date), value: Number(p.value) }))
+    .filter(p => Number.isFinite(p.value))
 )
 
 const speedLabel = computed(() => {

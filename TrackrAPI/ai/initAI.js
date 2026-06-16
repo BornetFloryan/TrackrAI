@@ -1,18 +1,23 @@
 const { spawn } = require("child_process");
 const fs = require("fs");
+const path = require("path");
+const { AI_DIR, PYTHON_EXECUTABLE } = require("../services/ai.service");
 
-const MODEL_PATH = process.env.AI_MODEL_PATH || "/app/ai/model.joblib";
+const MODEL_PATH = process.env.AI_MODEL_PATH || path.join(AI_DIR, "model.joblib");
 
 function initAI() {
-  if (fs.existsSync(MODEL_PATH)) {
-    console.log("[AI] Model already exists");
+  const trainOnStart = process.env.AI_TRAIN_ON_START !== "0";
+
+  if (fs.existsSync(MODEL_PATH) && !trainOnStart) {
+    console.log("[AI] Existing model kept (AI_TRAIN_ON_START=0)");
     return;
   }
 
-  console.log("[AI] No model found, training at startup…");
+  console.log("[AI] Training model at startup...");
 
-  const p = spawn("python3", ["/app/ai/train_model.py"], {
-    stdio: "inherit"
+  const p = spawn(PYTHON_EXECUTABLE, [path.join(AI_DIR, "train_model.py")], {
+    stdio: "inherit",
+    env: process.env,
   });
 
   p.on("close", (code) => {

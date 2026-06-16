@@ -1,6 +1,6 @@
 services:
   mongo:
-    image: mongo:4.4
+    image: mongo:6.0
     container_name: trackr-mongo-dev
     ports:
       - "27017:27017"

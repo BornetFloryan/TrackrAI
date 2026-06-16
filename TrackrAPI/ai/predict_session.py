@@ -6,15 +6,16 @@ import pandas as pd
 
 load_dotenv()
 
-MONGO = os.getenv("MONGODB_URL", "mongodb://mongo:27017/trackrapi")
-MODEL_PATH = os.getenv("AI_MODEL_PATH", "/app/ai/model.joblib")
+MONGO = os.getenv("MONGODB_URL", "mongodb://localhost:27017/trackrai")
+MODEL_PATH = os.getenv("AI_MODEL_PATH", os.path.join(os.path.dirname(__file__), "model.joblib"))
 
 def clamp(x, a, b):
     return max(a, min(b, x))
 
 def main():
     if len(sys.argv) < 2:
-        sys.exit(0)
+        print(json.dumps({"ok": False, "reason": "missing_session_id"}))
+        return
 
     if not os.path.exists(MODEL_PATH):
         print(json.dumps({"ok": False, "reason": "model_not_trained"}))
@@ -25,11 +26,11 @@ def main():
     s = db.sessions.find_one({"sessionId": session_id})
 
     if not s:
+        print(json.dumps({"ok": False, "reason": "session_not_found"}))
         return
 
     st = s.get("stats", {})
     baseline = st.get("score", {})
-    components = baseline.get("components", {})
 
     pack = load(MODEL_PATH)
     model = pack["model"]
@@ -42,7 +43,18 @@ def main():
 
     print(json.dumps({
         "ok": True,
-        "global": round(pred, 1)
+        "global": round(pred, 1),
+        "confidence": 0.6,
+        "explain": {
+            "baselineGlobal": baseline.get("global"),
+            "features": x
+        },
+        "model": {
+            "samples": pack.get("samples"),
+            "validationSamples": pack.get("validationSamples"),
+            "metrics": pack.get("metrics"),
+            "trainedAt": pack.get("trainedAt")
+        }
     }))
 
 

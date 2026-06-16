@@ -24,6 +24,13 @@
       </p>
     </div>
 
+    <div class="card" style="margin-top:1rem;">
+      <h3 style="margin:0 0 .35rem 0;">Coach référent</h3>
+      <p class="muted" style="margin:0;">
+        {{ coachLabel }}
+      </p>
+    </div>
+
     <div v-if="loading" class="card" style="margin-top:1rem;">
       Chargement…
     </div>
@@ -142,6 +149,7 @@ import { useRouter } from 'vue-router'
 
 import { useModuleStore } from '../store/module.store'
 import { useSessionStore } from '../store/session.store'
+import { useAuthStore } from '../store/auth.store'
 
 import StatCard from '../components/StatCard.vue'
 import GpsMap from '../components/GpsMap.vue'
@@ -150,6 +158,7 @@ import MetricLineChart from '../components/MetricLineChart.vue'
 const router = useRouter()
 const moduleStore = useModuleStore()
 const sessionStore = useSessionStore()
+const auth = useAuthStore()
 
 const days = ref(7)
 const loading = ref(false)
@@ -301,5 +310,10 @@ const globalInsight = computed(() => {
     intensity: intensity / n,
     recovery: recovery / n
   }
+})
+
+const coachLabel = computed(() => {
+  if (!auth.coach) return 'Aucun coach attribué pour le moment.'
+  return `Votre coach : ${auth.coach.login || '—'}`
 })
 </script>

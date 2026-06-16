@@ -119,9 +119,21 @@ const metric = ref('score')
 
 onMounted(async () => {
   await userStore.fetch()
-  athletes.value = userStore.users.filter(u => u.rights.includes('basic'))
+  athletes.value = userStore.users.filter(u =>
+    u.rights.includes('basic') && isAssignedToCurrentCoach(u)
+  )
   await reload()
 })
+
+function coachId(user) {
+  if (!user?.coach) return ''
+  return typeof user.coach === 'object' ? user.coach._id : user.coach
+}
+
+function isAssignedToCurrentCoach(user) {
+  const currentUserId = localStorage.getItem('trackr_user_id')
+  return String(coachId(user)) === String(currentUserId)
+}
 
 async function reload() {
   loading.value = true

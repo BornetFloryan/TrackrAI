@@ -17,7 +17,7 @@ class MainServer  {
 
     public MainServer(int port) throws IOException {
         this.port = port;
-        conn = new ServerSocket(port,1);
+        conn = new ServerSocket(port, 50);
         idThread = 1;
 		apiUrl = System.getenv().getOrDefault(
     		"TRACKR_API_URL",

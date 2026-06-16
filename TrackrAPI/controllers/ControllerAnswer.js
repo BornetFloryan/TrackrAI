@@ -1,3 +1,7 @@
+const { AsyncLocalStorage } = require('async_hooks')
+
+const answerStorage = new AsyncLocalStorage()
+
 /**
  * ControllerAnswer is a class that encapsulate any answer from a control function
  * A single instance of this class must be used for all the modules, so this single
@@ -17,15 +21,35 @@
 class ControllerAnswer {
 
   constructor() {
-    if (ControllerAnswer.exists) {
-      return ControllerAnswer.singleton
-    }
-    this.error = 0
-    this.status = 200
-    this.data = null
-    ControllerAnswer.exists = true
-    ControllerAnswer.singleton = this
-    return this
+    this.fallback = { error: 0, status: 200, data: null }
+  }
+
+  state() {
+    return answerStorage.getStore() || this.fallback
+  }
+
+  get error() {
+    return this.state().error
+  }
+
+  set error(value) {
+    this.state().error = value
+  }
+
+  get status() {
+    return this.state().status
+  }
+
+  set status(value) {
+    this.state().status = value
+  }
+
+  get data() {
+    return this.state().data
+  }
+
+  set data(value) {
+    this.state().data = value
   }
 
   /**
@@ -76,7 +100,7 @@ class ControllerAnswer {
    * test if there is an error
    * @return {boolean}
    */
-  isError() {q
+  isError() {
     return this.error !== 0;
 
   }
@@ -88,12 +112,25 @@ class ControllerAnswer {
   getError() {
     return this.error
   }
+
+  toJSON() {
+    return {
+      error: this.error,
+      status: this.status,
+      data: this.data,
+    }
+  }
 }
 
 // create a single instance that is the only object exported
 // Rk: the constructor is written to avoid that another call to new creates a new instance => singleton
 const answer = new ControllerAnswer()
 
+const answerContext = (req, res, next) => {
+  answerStorage.run({ error: 0, status: 200, data: null }, next)
+}
+
 module.exports = {
-  answer
+  answer,
+  answerContext,
 }

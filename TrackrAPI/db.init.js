@@ -1,5 +1,5 @@
 const { computePerformanceScore } = require("./utils/performanceScore");
-const { spawnSync } = require("child_process");
+const aiService = require("./services/ai.service");
 
 const User = require("./models/user.model");
 const Module = require("./models/module.model");
@@ -8,7 +8,6 @@ const bcrypt = require("bcryptjs");
 const Session = require("./models/session.model");
 const Measure = require("./models/measure.model");
 const SALT_WORK_FACTOR = 10;
-const path = require("path");
 
 let gps = null;
 let imu = null;
@@ -172,6 +171,27 @@ async function initUsers() {
   } catch {
     console.log("cannot add lea");
   }
+
+  try {
+    const coach = await User.findOne({ login: "coach" }).exec();
+    const martin = await User.findOne({ login: "martin" }).exec();
+
+    if (coach) {
+      await User.updateMany(
+        { login: { $in: ["test", "thomas"] } },
+        { $set: { coach: coach._id } }
+      ).exec();
+    }
+
+    if (martin) {
+      await User.updateOne(
+        { login: "lea" },
+        { $set: { coach: martin._id } }
+      ).exec();
+    }
+  } catch {
+    console.log("cannot assign demo athletes to coaches");
+  }
 }
 
 function rnd(min, max) {
@@ -306,31 +326,20 @@ async function createDemoSessionsForUser(userLogin, profile = {}) {
 
     await session.save();
 
-    const script = path.join(__dirname, "ai", "predict_session.py");
-    const out = spawnSync("python3", [script, session.sessionId], {
-      encoding: "utf-8",
-      env: process.env,
-    });
-
-    if (out.status !== 0) {
-      console.error("AI script failed:", out.stderr);
-    } else if (!out.stdout) {
-      console.error("AI script returned empty output");
-    } else {
-      try {
-        const ai = JSON.parse(out.stdout);
-
-        if (ai?.global != null && session.stats?.score) {
-          session.stats.score.global = ai.global;
-          session.stats.score.confidence = 0.6;
-          session.stats.aiExplain = ai.explain;
-          await session.save();
-        } else {
-          console.error("Invalid AI output structure:", ai);
-        }
-      } catch (e) {
-        console.error("AI JSON parse error:", out.stdout);
+    try {
+      const ai = aiService.predictSession(session.sessionId);
+      if (ai.ok && ai.global != null && session.stats?.score) {
+        session.stats.score.global = ai.global;
+        session.stats.score.confidence = ai.confidence;
+        session.stats.aiExplain = ai.explain;
+        session.stats.aiModel = ai.model;
+        session.markModified("stats");
+        await session.save();
+      } else {
+        console.error("Invalid AI output structure:", ai);
       }
+    } catch (error) {
+      console.error(`AI prediction failed for demo session ${session.sessionId}:`, error.message);
     }
 
     console.log(`added DEMO session ${userLogin} ${d + 1}`);

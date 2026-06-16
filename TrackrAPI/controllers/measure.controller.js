@@ -5,6 +5,7 @@
 
 const Measure = require("../models/measure.model");
 const Module = require("../models/module.model");
+const User = require("../models/user.model");
 const MeasureErrors = require("../commons/measure.errors");
 const ModuleErrors = require("../commons/module.errors");
 
@@ -46,9 +47,10 @@ function checkDate(date) {
 }
 
 function checkValue(value) {
+  const normalized = value === undefined || value === null ? undefined : String(value);
   if (
-    value === undefined ||
-    !validator.isAlphanumeric(value, "fr-FR", { ignore: ".-_" })
+    normalized === undefined ||
+    !validator.isAlphanumeric(normalized, "fr-FR", { ignore: ".-_" })
   ) {
     answer.set(
       MeasureErrors.getError(MeasureErrors.ERR_MEASURE_VALUE_NOT_DEFINED)
@@ -115,7 +117,7 @@ const create = async function (req, res, next) {
   const m = {
     type: req.body.type,
     date: req.body.date,
-    value: req.body.value,
+    value: String(req.body.value),
     module: session.module,
     session: session._id,
   };
@@ -152,18 +154,16 @@ const create = async function (req, res, next) {
  */
 const update = async function (req, res, next) {
   answer.reset();
-  console.log("update measure");
+  const { idMeasure, data } = req.body;
 
-  // sanity check on parameters
-  if (!checkData(req.body.data)) {
+  if (!idMeasure || !checkData(data) || typeof data !== "object" || Array.isArray(data)) {
     return next(answer);
   }
 
   let measure = null;
 
-  // check if measure exists
   try {
-    measure = await Measure.findOne({ _id: req.body.idMeasure }).exec();
+    measure = await Measure.findOne({ _id: idMeasure }).exec();
     if (measure === null) {
       answer.set(
         MeasureErrors.getError(MeasureErrors.ERR_MEASURE_CANNOT_FIND_ID)
@@ -177,8 +177,20 @@ const update = async function (req, res, next) {
     return next(answer);
   }
 
+  const allowedFields = ["type", "date", "value"];
+  const updates = Object.fromEntries(
+    Object.entries(data).filter(([key]) => allowedFields.includes(key))
+  );
+
+  if (updates.type !== undefined && !checkType(updates.type)) return next(answer);
+  if (updates.date !== undefined && !checkDate(updates.date)) return next(answer);
+  if (updates.value !== undefined) {
+    if (!checkValue(updates.value)) return next(answer);
+    updates.value = String(updates.value);
+  }
+
   try {
-    measure.set(req.body.data);
+    measure.set(updates);
   } catch (err) {
     console.log("error while updating whole measure");
     answer.set(MeasureErrors.getError(MeasureErrors.ERR_MEASURE_CANNOT_UPDATE));
@@ -214,6 +226,20 @@ const getMeasures = async function (req, res, next) {
 
   let filter = {};
   let module = null;
+
+  if (req.user.rights.includes("admin")) {
+    // administrators can inspect every measure
+  } else if (req.user.rights.includes("coach")) {
+    const athletes = await User.find({ coach: req.user._id }, "_id").lean().exec();
+    const sessions = await Session.find(
+      { user: { $in: athletes.map((athlete) => athlete._id) } },
+      "_id"
+    ).lean().exec();
+    filter.session = { $in: sessions.map((session) => session._id) };
+  } else {
+    const sessions = await Session.find({ user: req.user._id }, "_id").lean().exec();
+    filter.session = { $in: sessions.map((session) => session._id) };
+  }
 
   // if key is provided
   if (req.query.key) {
@@ -295,6 +321,28 @@ const getAnalysisById = async function (req, res, next) {
     parsed = null;
   }
 
+  if (!req.user.rights.includes("admin") && !req.user.rights.includes("coach")) {
+    const owner = parsed?.userId;
+    const isOwner = owner && (
+      String(owner) === String(req.user._id) ||
+      String(owner) === String(req.user.login)
+    );
+
+    if (!isOwner) {
+      return res.status(404).send(answer);
+    }
+  } else if (req.user.rights.includes("coach") && !req.user.rights.includes("admin")) {
+    const athletes = await User.find({ coach: req.user._id }, "_id login").lean().exec();
+    const allowedOwners = new Set(
+      athletes.flatMap((athlete) => [String(athlete._id), String(athlete.login)])
+    );
+
+    const owner = parsed?.userId;
+    if (!owner || !allowedOwners.has(String(owner))) {
+      return res.status(404).send(answer);
+    }
+  }
+
   answer.data = {
     analysisId: measure.analysisId,
     type: measure.type,
@@ -305,9 +353,73 @@ const getAnalysisById = async function (req, res, next) {
   return res.status(200).send(answer);
 };
 
+function parseStoredAnalysis(measure) {
+  let parsed = null;
+  try {
+    const jsonStr = Buffer.from(measure.value, "base64").toString("utf-8");
+    parsed = JSON.parse(jsonStr);
+  } catch (e) {
+    parsed = null;
+  }
+
+  return {
+    analysisId: measure.analysisId,
+    type: measure.type,
+    date: measure.date,
+    result: parsed,
+  };
+}
+
+const getAnalyses = async function (req, res, next) {
+  answer.reset();
+
+  const limit = Math.min(Number(req.query.limit || 50), 100);
+
+  let measures;
+  try {
+    measures = await Measure.find({ analysisId: { $exists: true, $ne: null } })
+      .sort({ date: -1 })
+      .limit(req.user.rights.includes("admin") ? limit : 500)
+      .lean()
+      .exec();
+  } catch (err) {
+    answer.set(
+      MeasureErrors.getError(MeasureErrors.ERR_MEASURE_INVALID_FIND_REQUEST)
+    );
+    return next(answer);
+  }
+
+  let analyses = measures.map(parseStoredAnalysis);
+
+  if (!req.user.rights.includes("admin") && !req.user.rights.includes("coach")) {
+    const currentUserId = String(req.user._id);
+    analyses = analyses.filter((analysis) => {
+      const owner = analysis.result?.userId;
+      return owner && (
+        String(owner) === currentUserId ||
+        String(owner) === String(req.user.login)
+      );
+    });
+  } else if (req.user.rights.includes("coach") && !req.user.rights.includes("admin")) {
+    const athletes = await User.find({ coach: req.user._id }, "_id login").lean().exec();
+    const allowedOwners = new Set(
+      athletes.flatMap((athlete) => [String(athlete._id), String(athlete.login)])
+    );
+
+    analyses = analyses.filter((analysis) => {
+      const owner = analysis.result?.userId;
+      return owner && allowedOwners.has(String(owner));
+    });
+  }
+
+  answer.setPayload(analyses.slice(0, limit));
+  return res.status(200).send(answer);
+};
+
 module.exports = {
   create,
   update,
   getMeasures,
+  getAnalyses,
   getAnalysisById,
 };

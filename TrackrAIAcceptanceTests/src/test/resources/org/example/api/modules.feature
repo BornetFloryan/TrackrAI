@@ -8,6 +8,7 @@ Feature: Gestion des modules
 
   Scenario: Récupération des modules
     Given l'API Trackr est disponible
+    And je suis authentifié
     When je demande la liste des modules
     Then le code HTTP est 200
     And une liste de modules est retournée

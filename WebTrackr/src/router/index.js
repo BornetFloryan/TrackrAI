@@ -9,6 +9,7 @@ import SessionDetailView from '../views/SessionDetailView.vue'
 import AdminView from '../views/AdminView.vue'
 import CoachView from '../views/CoachView.vue'
 import MobileVideoView from '../views/MobileVideoView.vue'
+import AnalysisHistoryView from '../views/AnalysisHistoryView.vue'
 import CoachAthletesView from '../views/CoachAthletesView.vue'
 import CoachAthleteDashboardView from '../views/CoachAthleteDashboardView.vue'
 
@@ -70,7 +71,12 @@ const routes = [
   {
     path: '/mobile/video',
     component: MobileVideoView,
-    meta: { requiresAuth: true, mobileOnly: true }
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/analyses',
+    component: AnalysisHistoryView,
+    meta: { requiresAuth: true }
   },
 ]
 
@@ -78,13 +84,6 @@ const router = createRouter({
   history: createWebHistory(),
   routes
 })
-
-function isMobile() {
-  return (
-    window.matchMedia?.('(max-width: 820px)').matches ||
-    /Mobi|Android/i.test(navigator.userAgent)
-  )
-}
 
 router.beforeEach((to, from, next) => {
   const auth = useAuthStore()
@@ -124,11 +123,6 @@ router.beforeEach((to, from, next) => {
     return auth.rights.includes('admin')
       ? next('/admin')
       : next('/coach')
-  }
-
-  // MOBILE 
-  if (to.meta.mobileOnly && !isMobile()) {
-    return next('/dashboard')
   }
 
   next()

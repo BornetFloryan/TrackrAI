@@ -12,10 +12,13 @@ export default {
     return res.data.data
   },
   async fetchAnalysis(analysisId) {
-    console.log('Fetching analysis', analysisId)
-    const res = await fetch(`/trackrapi/analysis/${analysisId}`)
-    if (!res.ok) throw new Error('Analysis not found')
-      const json = await res.json()
-    return json.data
+    const res = await api.get(`/analysis/${analysisId}`)
+    if (res.data.error !== 0) throw new Error(res.data.data)
+    return res.data.data
+  },
+  async fetchAnalyses(limit = 50) {
+    const res = await api.get('/analysis', { params: { limit } })
+    if (res.data.error !== 0) throw new Error(res.data.data)
+    return res.data.data
   }
 }

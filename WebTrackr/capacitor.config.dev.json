@@ -3,7 +3,7 @@
   "appName": "TrackrAI",
   "webDir": "dist",
   "server": {
-    "url": "http://192.168.31.101:5173",
+    "url": "http://localhost:5173",
     "cleartext": true
   }
 }

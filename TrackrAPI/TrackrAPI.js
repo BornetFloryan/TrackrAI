@@ -7,6 +7,7 @@ const cors = require("cors");
 const trackrapiRouter = require('./routes/trackrapi.route'); // Imports routes
 const Config = require("./commons/config");
 const { initAI } = require("./ai/initAI");
+const { answerContext } = require("./controllers/ControllerAnswer");
 
 // extras imports
 const path = require('path');
@@ -29,14 +30,6 @@ const privateKey  = fs.readFileSync('ssl/trackrapi.key', 'utf8');
 const certificate = fs.readFileSync('ssl/trackrapi.crt', 'utf8');
 const credentials = {key: privateKey, cert: certificate};
 */
-
-//process.chdir('/home/sdomas/code/node/geseapi');
-// read env files
-const result = require('dotenv').config();
-if (result.error) {
-  throw result.error
-}
-
 
 // use express
 const app = express();
@@ -73,6 +66,7 @@ mongoose.set('useFindAndModify', false);
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
+app.use(answerContext);
 
 // define routes
 app.use(function(req, res, next) {
@@ -116,7 +110,8 @@ httpsServer.listen(process.env.PORT, () =>
 // start server without SSL
 
 const httpServer = http.createServer(app);
-httpServer.listen(process.env.PORT, () =>
-  console.log(`trackrapi started on port ${process.env.PORT}!`)
+const port = Number(process.env.PORT || 4567);
+httpServer.listen(port, () =>
+  console.log(`trackrapi started on port ${port}!`)
 );
 

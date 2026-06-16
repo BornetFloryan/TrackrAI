@@ -85,8 +85,8 @@ const register = async function (req, res, next) {
   let stop = false
   while(!stop) {
     name = "module "+nb;
-    module = await Module.findOne({name: name}).exec()
-    if (module === null) {
+    const existingModule = await Module.findOne({name: name}).exec()
+    if (existingModule === null) {
       stop = true
     }
     else {
@@ -98,8 +98,8 @@ const register = async function (req, res, next) {
   let key = uuidv4()
   stop = false
   while (!stop) {
-    module = await Module.findOne({key: key}).exec();
-    if (module === null) {
+    const existingModule = await Module.findOne({key: key}).exec();
+    if (existingModule === null) {
       stop = true
     }
     else {
@@ -240,16 +240,16 @@ const create = async function (req, res, next) {
  */
 const update = async function (req, res, next) {
   answer.reset()
-  console.log('update module');
-  // sanity check on parameters
-  if (!checkData(req.body.data)) {
+  const { idModule, data } = req.body
+
+  if (!idModule || !checkData(data) || typeof data !== 'object' || Array.isArray(data)) {
     return next(answer);
   }
 
   let module = null
   // check if module exists
   try {
-    module = await Module.findOne({_id:idModule}).exec();
+    module = await Module.findOne({_id: idModule}).exec();
     if (module === null) {
       answer.set(ModuleErrors.getError(ModuleErrors.ERR_MODULE_CANNOT_FIND_ID))
       return next(answer);
@@ -260,8 +260,17 @@ const update = async function (req, res, next) {
     return next(answer);
   }
 
+  const allowedFields = ['name', 'shortName', 'uc', 'chipsets']
+  const updates = Object.fromEntries(
+    Object.entries(data).filter(([key]) => allowedFields.includes(key))
+  )
+
+  if (updates.name !== undefined && !checkName(updates.name)) return next(answer)
+  if (updates.uc !== undefined && !checkUC(updates.uc)) return next(answer)
+  if (updates.chipsets !== undefined && !checkChipsets(updates.chipsets)) return next(answer)
+
   try {
-    module.set(req.body.data);
+    module.set(updates);
   }
   catch(err) {
     console.log("error while updating whole module");

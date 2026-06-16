@@ -16,10 +16,8 @@ public class ApiAuthSteps {
         envoyerRequeteAuth("admin", "admin");
 
         if (WorldContext.api.lastResponseBody.contains("token")) {
-            String body = WorldContext.api.lastResponseBody;
-            WorldContext.api.sessionToken =
-                    body.substring(body.indexOf("token") + 7)
-                            .replaceAll("[^a-zA-Z0-9-]", "");
+            WorldContext.api.sessionToken = WorldContext.api.lastResponseBody
+                    .replaceFirst(".*\"token\":\"([^\"]+)\".*", "$1");
         }
     }
 

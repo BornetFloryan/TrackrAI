@@ -4,16 +4,32 @@
 
     <div class="card">
       <p class="muted">
-        Sélectionnez un sportif pour analyser ses performances globales.
+        Sélectionnez un sportif suivi pour analyser ses performances globales.
       </p>
 
-      <input v-model="query" type="text" placeholder="Rechercher par nom ou email…" class="input"
-        style="margin-top:.75rem; max-width:360px;" />
+      <div class="form-row" style="margin-top:.75rem;">
+        <select v-model="scope">
+          <option value="mine">Mes sportifs</option>
+          <option value="all">Tous les sportifs</option>
+        </select>
+        <input v-model="query" type="text" placeholder="Rechercher par nom ou email…" class="input" />
+      </div>
     </div>
 
     <div class="grid grid-3" style="margin-top:1rem;">
-      <div v-for="u in filteredAthletes" :key="u._id" class="card athlete-card" @click="go(u._id)">
-        <div class="name">{{ u.login }}</div>
+      <div
+        v-for="u in filteredAthletes"
+        :key="u._id"
+        class="card athlete-card"
+        :class="{ disabled: !isMine(u) }"
+        @click="go(u)"
+      >
+        <div class="name">
+          {{ u.login }}
+          <span class="badge" :class="isMine(u) ? 'badge-success' : 'badge-warning'">
+            {{ isMine(u) ? 'Suivi par vous' : coachLabel(u) }}
+          </span>
+        </div>
         <div class="email">{{ u.email }}</div>
 
         <div v-if="athleteInsights[u._id]" class="insights">
@@ -31,7 +47,9 @@
           </ul>
         </div>
 
-        <div class="hint">Voir le profil →</div>
+        <div class="hint">
+          {{ isMine(u) ? 'Voir le profil →' : 'Non accessible sans affectation' }}
+        </div>
       </div>
 
       <div v-if="!filteredAthletes.length" class="card muted">
@@ -47,12 +65,15 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../store/user.store'
 import { useSessionStore } from '../store/session.store'
+import { useAuthStore } from '../store/auth.store'
 
 const router = useRouter()
 const userStore = useUserStore()
 const sessionStore = useSessionStore()
+const auth = useAuthStore()
 
 const query = ref('')
+const scope = ref('mine')
 const sessions = ref([])
 
 onMounted(async () => {
@@ -65,13 +86,34 @@ const athletes = computed(() =>
 )
 
 const filteredAthletes = computed(() => {
-  if (!query.value) return athletes.value
+  let list = athletes.value
+
+  if (scope.value === 'mine') {
+    list = list.filter(isMine)
+  }
+
+  if (!query.value) return list
   const q = query.value.toLowerCase()
-  return athletes.value.filter(u =>
+  return list.filter(u =>
     u.login?.toLowerCase().includes(q) ||
     u.email?.toLowerCase().includes(q)
   )
 })
+
+function coachId(user) {
+  if (!user?.coach) return ''
+  return typeof user.coach === 'object' ? user.coach._id : user.coach
+}
+
+function isMine(user) {
+  return String(coachId(user)) === String(auth.userId)
+}
+
+function coachLabel(user) {
+  if (!user?.coach) return 'Aucun coach'
+  if (typeof user.coach === 'object') return `Coach : ${user.coach.login || '—'}`
+  return 'Autre coach'
+}
 
 const athleteInsights = computed(() => {
   const map = {}
@@ -110,8 +152,9 @@ const athleteInsights = computed(() => {
   return map
 })
 
-function go(userId) {
-  router.push(`/coach/athletes/${userId}`)
+function go(user) {
+  if (!isMine(user)) return
+  router.push(`/coach/athletes/${user._id}`)
 }
 </script>
 
@@ -128,6 +171,17 @@ function go(userId) {
   box-shadow: 0 8px 28px rgba(110, 231, 255, .12);
 }
 
+.athlete-card.disabled {
+  cursor: not-allowed;
+  opacity: .68;
+}
+
+.athlete-card.disabled:hover {
+  transform: none;
+  border-color: var(--border);
+  box-shadow: none;
+}
+
 .name {
   font-weight: 900;
   font-size: 1.05rem;
@@ -142,5 +196,17 @@ function go(userId) {
   margin-top: .4rem;
   font-size: .8rem;
   color: rgba(110, 231, 255, .85);
+}
+
+.form-row {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  max-width: 620px;
+}
+
+.form-row > * {
+  flex: 1;
+  min-width: 220px;
 }
 </style>

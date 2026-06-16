@@ -97,6 +97,29 @@ button:disabled{
   color: var(--muted);
 }
 
+.badge-success {
+  border-color: rgba(52,211,153,.38);
+  background: rgba(52,211,153,.12);
+  color: #bbf7d0;
+}
+
+.badge-warning {
+  border-color: rgba(251,191,36,.38);
+  background: rgba(251,191,36,.12);
+  color: #fde68a;
+}
+
+.badge-danger {
+  border-color: rgba(255,92,122,.38);
+  background: rgba(255,92,122,.12);
+  color: #fecdd3;
+}
+
+.error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 .hr{
   height:1px;
   border:0;

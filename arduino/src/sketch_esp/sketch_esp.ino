@@ -64,7 +64,7 @@ bool recording = false;
 uint16_t heartRate = 0;
 
 /* ================= CONFIG DYNAMIQUE ================= */
-char server_host[64] = "82.64.26.75";
+char server_host[64] = "";
 char server_port[6]  = "29000";
 
 /* ================= GPS FILTER ================= */
@@ -473,5 +473,4 @@ void loop() {
     sendMeasure("gyro_z", gz);
   }
 }
-
 

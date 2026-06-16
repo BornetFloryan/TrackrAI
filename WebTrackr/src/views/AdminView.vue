@@ -17,6 +17,8 @@
               <th>Login</th>
               <th>Email</th>
               <th>Rôle(s)</th>
+              <th>Coach</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -32,6 +34,12 @@
                 >
                   {{ r }}
                 </span>
+              </td>
+              <td>{{ coachLabel(u.coach) }}</td>
+              <td>
+                <button class="secondary" @click="selectUser(u)">
+                  Modifier
+                </button>
               </td>
             </tr>
           </tbody>
@@ -54,6 +62,12 @@
             <option value="coach">Coach</option>
             <option value="admin">Admin</option>
           </select>
+          <select v-if="newUser.role === 'basic'" v-model="newUser.coach">
+            <option value="">Aucun coach</option>
+            <option v-for="c in coachUsers" :key="c._id" :value="c._id">
+              {{ c.login }}
+            </option>
+          </select>
         </div>
 
         <button
@@ -65,6 +79,41 @@
         </button>
 
         <p v-if="userError" class="error">{{ userError }}</p>
+
+        <template v-if="editingUser.id">
+          <hr style="margin:1rem 0" />
+          <h4>Modifier l'utilisateur</h4>
+
+          <div class="form-row">
+            <input v-model="editingUser.login" placeholder="Login" />
+            <input v-model="editingUser.email" placeholder="Email" />
+            <select v-model="editingUser.role">
+              <option value="basic">Sportif</option>
+              <option value="coach">Coach</option>
+              <option value="admin">Admin</option>
+            </select>
+            <select v-if="editingUser.role === 'basic'" v-model="editingUser.coach">
+              <option value="">Aucun coach</option>
+              <option v-for="c in coachUsers" :key="c._id" :value="c._id">
+                {{ c.login }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-row" style="margin-top:.5rem;">
+            <input
+              v-model="editingUser.password"
+              type="password"
+              placeholder="Nouveau mot de passe (optionnel)"
+            />
+            <button @click="updateUser" :disabled="updatingUser">
+              Enregistrer
+            </button>
+            <button class="secondary" @click="cancelUserEdit">
+              Annuler
+            </button>
+          </div>
+        </template>
       </div>
 
       <div class="card">
@@ -81,6 +130,8 @@
               <th>Nom</th>
               <th>UC</th>
               <th>Clé</th>
+              <th>État</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -88,6 +139,16 @@
               <td>{{ m.name }}</td>
               <td>{{ m.uc }}</td>
               <td class="mono">{{ m.key }}</td>
+              <td>
+                <span class="badge" :class="m.connected ? 'badge-success' : ''">
+                  {{ m.connected ? 'connecté' : 'hors ligne' }}
+                </span>
+              </td>
+              <td>
+                <button class="secondary" @click="selectModule(m)">
+                  Modifier
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -110,6 +171,25 @@
         </button>
 
         <p v-if="registerError" class="error">{{ registerError }}</p>
+
+        <template v-if="editingModule.id">
+          <hr style="margin:1rem 0" />
+          <h4>Modifier le module</h4>
+
+          <div class="form-row">
+            <input v-model="editingModule.name" placeholder="Nom" />
+            <input v-model="editingModule.uc" placeholder="UC" />
+          </div>
+
+          <div class="form-row" style="margin-top:.5rem;">
+            <button @click="updateModule" :disabled="updatingModule">
+              Enregistrer
+            </button>
+            <button class="secondary" @click="cancelModuleEdit">
+              Annuler
+            </button>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -152,10 +232,36 @@ const newUser = ref({
   email: '',
   password: '',
   role: 'basic',
+  coach: '',
 })
 
 const creatingUser = ref(false)
+const updatingUser = ref(false)
 const userError = ref('')
+const editingUser = ref({
+  id: '',
+  login: '',
+  email: '',
+  role: 'basic',
+  coach: '',
+  password: '',
+})
+
+const coachUsers = computed(() =>
+  users.value.filter(u => u.rights?.includes('coach'))
+)
+
+function coachId(coach) {
+  if (!coach) return ''
+  return typeof coach === 'object' ? coach._id : coach
+}
+
+function coachLabel(coach) {
+  if (!coach) return '—'
+  if (typeof coach === 'object') return coach.login || coach._id || '—'
+  const found = users.value.find(u => u._id === coach)
+  return found?.login || coach
+}
 
 const canCreateUser = computed(() =>
   newUser.value.login &&
@@ -174,6 +280,7 @@ async function createUser() {
       email: newUser.value.email,
       password: newUser.value.password,
       rights: [newUser.value.role],
+      coach: newUser.value.role === 'basic' ? newUser.value.coach || undefined : undefined,
     })
 
     newUser.value = {
@@ -181,6 +288,7 @@ async function createUser() {
       email: '',
       password: '',
       role: 'basic',
+      coach: '',
     }
 
     await userStore.fetch()
@@ -191,6 +299,54 @@ async function createUser() {
   }
 }
 
+function selectUser(user) {
+  editingUser.value = {
+    id: user._id,
+    login: user.login,
+    email: user.email,
+    role: user.rights?.[0] || 'basic',
+    coach: coachId(user.coach),
+    password: '',
+  }
+}
+
+function cancelUserEdit() {
+  editingUser.value = {
+    id: '',
+    login: '',
+    email: '',
+    role: 'basic',
+    coach: '',
+    password: '',
+  }
+}
+
+async function updateUser() {
+  userError.value = ''
+  updatingUser.value = true
+
+  try {
+    const data = {
+      login: editingUser.value.login,
+      email: editingUser.value.email,
+      rights: [editingUser.value.role],
+      coach: editingUser.value.role === 'basic' ? editingUser.value.coach || null : null,
+    }
+
+    if (editingUser.value.password) {
+      data.password = editingUser.value.password
+    }
+
+    await userStore.update(editingUser.value.id, data)
+    cancelUserEdit()
+    await userStore.fetch()
+  } catch (e) {
+    userError.value = e?.data || e?.message || 'Erreur modification utilisateur'
+  } finally {
+    updatingUser.value = false
+  }
+}
+
 const newModule = ref({
   name: '',
   uc: '',
@@ -198,7 +354,13 @@ const newModule = ref({
 })
 
 const registering = ref(false)
+const updatingModule = ref(false)
 const registerError = ref('')
+const editingModule = ref({
+  id: '',
+  name: '',
+  uc: '',
+})
 
 const canRegister = computed(() =>
   newModule.value.name &&
@@ -225,6 +387,40 @@ async function createModule() {
     registerError.value = e?.data || 'Erreur création module'
   } finally {
     registering.value = false
+  }
+}
+
+function selectModule(module) {
+  editingModule.value = {
+    id: module._id,
+    name: module.name,
+    uc: module.uc,
+  }
+}
+
+function cancelModuleEdit() {
+  editingModule.value = {
+    id: '',
+    name: '',
+    uc: '',
+  }
+}
+
+async function updateModule() {
+  registerError.value = ''
+  updatingModule.value = true
+
+  try {
+    await moduleStore.update(editingModule.value.id, {
+      name: editingModule.value.name,
+      uc: editingModule.value.uc,
+    })
+    cancelModuleEdit()
+    await moduleStore.fetch()
+  } catch (e) {
+    registerError.value = e?.data || e?.message || 'Erreur modification module'
+  } finally {
+    updatingModule.value = false
   }
 }
 </script>
