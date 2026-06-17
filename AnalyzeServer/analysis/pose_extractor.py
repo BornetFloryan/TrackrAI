@@ -14,11 +14,15 @@ class PoseFrame:
 def extract_pose_frames(
     video_path: str,
     sample_every_n: int = 2,
-    min_visibility: float = 0.4
+    min_visibility: float = 0.4,
+    key_ids: Optional[List[int]] = None,
 ) -> List[PoseFrame]:
     """
     Extract pose landmarks from a video. Samples 1 frame every N frames for speed.
     """
+    if key_ids is None:
+        key_ids = [23, 24, 25, 26, 27, 28]  # hips/knees/ankles for lower-body exercises
+
     cap = cv2.VideoCapture(video_path)
     pose = mp_pose.Pose(model_complexity=1, enable_segmentation=False)
 
@@ -40,8 +44,6 @@ def extract_pose_frames(
 
         if res.pose_landmarks:
             lm = res.pose_landmarks.landmark
-            # quick visibility check on hips/knees/ankles
-            key_ids = [23, 24, 25, 26, 27, 28]
             if any(lm[i].visibility >= min_visibility for i in key_ids):
                 frames.append(PoseFrame(w, h, res.pose_landmarks))
             else:

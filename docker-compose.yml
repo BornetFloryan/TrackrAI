@@ -17,6 +17,9 @@ services:
       - PORT=4567
       - CENTRAL_HOST=central
       - CENTRAL_PORT=9000
+      - SERVICE_SECRET=trackrai-service
+      - USER_ACCESS_TOKEN_TTL_MINUTES=15
+      - USER_REFRESH_TOKEN_TTL_DAYS=7
     ports:
       - "4567:4567"
 
@@ -30,6 +33,7 @@ services:
     environment:
       - TRACKR_API_URL=http://api:4567/trackrapi
       - MONGO_URL=mongodb://mongo:27017/trackrai
+      - SERVICE_SECRET=trackrai-service
     ports:
       - "29000:9000"
 

@@ -1,4 +1,6 @@
 from typing import Any, Dict
+from analysis.bench_analyzer import analyze_bench
+from analysis.deadlift_analyzer import analyze_deadlift
 from analysis.squat_analyzer import analyze_squat
 
 def analyze_video_for_exercise(
@@ -12,6 +14,12 @@ def analyze_video_for_exercise(
 
     if ex == "squat":
         a = analyze_squat(video_path)
+    elif ex in ("bench", "bench_press", "developpe_couche", "developpe couche"):
+        ex = "bench"
+        a = analyze_bench(video_path)
+    elif ex in ("deadlift", "souleve_de_terre", "souleve de terre"):
+        ex = "deadlift"
+        a = analyze_deadlift(video_path)
     else:
         a = {
             "ok": False,

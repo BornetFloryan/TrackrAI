@@ -2,6 +2,15 @@
   <div class="page">
     <h1>Analyse vidéo</h1>
 
+    <label class="form-field">
+      <span>Exercice</span>
+      <select v-model="exercise">
+        <option value="squat">Squat</option>
+        <option value="bench">Developpe couche experimental</option>
+        <option value="deadlift">Souleve de terre experimental</option>
+      </select>
+    </label>
+
     <input type="file" accept="video/*" @change="onFile" />
 
     <button @click="sendVideo" :disabled="loading">
@@ -16,6 +25,7 @@
     </p>
 
     <div v-if="result" class="card">
+      <p class="muted">Exercice analyse : {{ exerciseLabels[resultExercise] || resultExercise }}</p>
       <h3>Score : {{ result.score }}</h3>
       <ul>
         <li v-for="e in result.errors" :key="e">❌ {{ e }}</li>
@@ -35,10 +45,17 @@ import { useAuthStore } from '../store/auth.store'
 const auth = useAuthStore()
 const videoFile = ref(null)
 const result = ref(null)
+const resultExercise = ref('')
+const exercise = ref('squat')
 const loading = ref(false)
 const analysisId = ref('')
 const error = ref('')
 const progress = ref('')
+const exerciseLabels = {
+  squat: 'Squat',
+  bench: 'Developpe couche',
+  deadlift: 'Souleve de terre'
+}
 
 function onFile(e) {
   videoFile.value = e.target.files[0]
@@ -59,6 +76,7 @@ async function sendVideo() {
 
   loading.value = true
   result.value = null
+  resultExercise.value = ''
   analysisId.value = ''
   error.value = ''
   progress.value = 'Connexion au serveur d’analyse…'
@@ -76,7 +94,7 @@ async function sendVideo() {
   }
   socket.send({
     type: 'START_ANALYSIS',
-    exercise: 'squat',
+    exercise: exercise.value,
     userId: auth.userId || auth.login || 'anonymous',
     meta: {
       login: auth.login,
@@ -115,6 +133,7 @@ async function sendVideo() {
     if (msg.type === 'RESULT') {
       console.log('Received analysis result', msg)
       result.value = msg.data.analysis
+      resultExercise.value = msg.data.exercise || exercise.value
       analysisId.value = msg.data.analysisId
       loading.value = false
       progress.value = ''

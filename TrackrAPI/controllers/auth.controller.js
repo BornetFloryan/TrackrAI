@@ -16,6 +16,46 @@ const AuthErrors = require('../commons/auth.errors');
 const Helpers = require('./helpers.controller');
 const {answer} = require('./ControllerAnswer')
 
+const ACCESS_TOKEN_TTL_MINUTES = Number(
+  process.env.USER_ACCESS_TOKEN_TTL_MINUTES ||
+  (Number(process.env.USER_SESSION_TTL_HOURS || 12) * 60)
+)
+const REFRESH_TOKEN_TTL_DAYS = Number(process.env.USER_REFRESH_TOKEN_TTL_DAYS || 7)
+
+function buildAccessExpiry() {
+  return new Date(Date.now() + ACCESS_TOKEN_TTL_MINUTES * 60 * 1000)
+}
+
+function buildRefreshExpiry() {
+  return new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000)
+}
+
+function issueTokens(user) {
+  user.sessionId = uuidv4()
+  user.sessionExpiresAt = buildAccessExpiry()
+  user.refreshToken = uuidv4()
+  user.refreshExpiresAt = buildRefreshExpiry()
+}
+
+function toAuthPayload(user) {
+  const coachInfo = user.coach ? {
+    _id: user.coach._id,
+    login: user.coach.login,
+    email: user.coach.email,
+  } : null
+
+  return {
+    userId: user._id,
+    login: user.login,
+    coach: coachInfo,
+    rights: user.rights,
+    token: user.sessionId,
+    expiresAt: user.sessionExpiresAt,
+    refreshToken: user.refreshToken,
+    refreshExpiresAt: user.refreshExpiresAt,
+  }
+}
+
 /**
  * check correctness of name parameter (from req.body.name)
  * @param {String} name - the parameter to test
@@ -83,18 +123,7 @@ const signIn = async function (req, res, next) {
     return next(answer);
   }
 
-  const coachInfo = user.coach ? {
-    _id: user.coach._id,
-    login: user.coach.login,
-    email: user.coach.email,
-  } : null;
-
-  // here should add a jwt token creation, or something else
-  // to provide a secure authentication for following requests
-  // For now just generate a random session id that must be prodvided in next requests.
-
-  let sessionId = uuidv4();
-  user.sessionId = sessionId
+  issueTokens(user)
   try {
     user = await user.save()
   }
@@ -103,13 +132,7 @@ const signIn = async function (req, res, next) {
     return next(answer)
   }
 
-  answer.setPayload({
-    userId: user._id,
-    login: user.login,
-    coach: coachInfo,
-    rights: user.rights,
-    token: sessionId,
-  })
+  answer.setPayload(toAuthPayload(user))
 
   res.status(200).send(answer);
 };
@@ -127,10 +150,19 @@ const verifyToken = async function (req, res, next) {
   }
   // now find if user in in DB and bind it the req
   try {
-    let user = await User.findOne({sessionId: id}).exec()
+    let user = await User.findOne({sessionId: id})
+      .populate('coach', '_id login email')
+      .exec()
     if (user === null) {
       answer.set (AuthErrors.getError(AuthErrors.ERR_AUTH_NOT_AUTHORIZED));
       return next(answer);
+    }
+    if (user.sessionExpiresAt && user.sessionExpiresAt.getTime() < Date.now()) {
+      user.sessionId = undefined
+      user.sessionExpiresAt = undefined
+      await user.save()
+      answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_NOT_AUTHORIZED))
+      return next(answer)
     }
     req.user = user;
   }
@@ -140,6 +172,80 @@ const verifyToken = async function (req, res, next) {
   }
   return next();
 
+}
+
+const logout = async function (req, res, next) {
+  answer.reset()
+
+  req.user.sessionId = undefined
+  req.user.sessionExpiresAt = undefined
+  req.user.refreshToken = undefined
+  req.user.refreshExpiresAt = undefined
+  await req.user.save()
+
+  answer.setPayload({ loggedOut: true })
+  return res.status(200).send(answer)
+}
+
+const me = async function (req, res) {
+  answer.reset()
+  answer.setPayload(toAuthPayload(req.user))
+  return res.status(200).send(answer)
+}
+
+const refresh = async function (req, res, next) {
+  answer.reset()
+
+  const token = req.body?.refreshToken || req.headers["x-refresh-token"]
+  if (!token) {
+    answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_NO_TOKEN))
+    return next(answer)
+  }
+
+  let user
+  try {
+    user = await User.findOne({ refreshToken: token })
+      .populate('coach', '_id login email')
+      .exec()
+  } catch (_) {
+    answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_NOT_AUTHORIZED))
+    return next(answer)
+  }
+
+  if (!user || !user.refreshExpiresAt || user.refreshExpiresAt.getTime() < Date.now()) {
+    if (user) {
+      user.sessionId = undefined
+      user.sessionExpiresAt = undefined
+      user.refreshToken = undefined
+      user.refreshExpiresAt = undefined
+      await user.save()
+    }
+    answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_NOT_AUTHORIZED))
+    return next(answer)
+  }
+
+  issueTokens(user)
+  await user.save()
+
+  answer.setPayload(toAuthPayload(user))
+  return res.status(200).send(answer)
+}
+
+const verifyServiceSecret = async function (req, res, next) {
+  answer.reset()
+
+  const expected = process.env.SERVICE_SECRET
+  if (!expected) {
+    return next()
+  }
+
+  const provided = req.headers["x-service-secret"]
+  if (provided && provided === expected) {
+    return next()
+  }
+
+  answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_NOT_AUTHORIZED))
+  return next(answer)
 }
 
 /**
@@ -174,7 +280,11 @@ const onlyAdminOrCoach = async function(req, res, next) {
 
 module.exports = {
   verifyToken,
+  verifyServiceSecret,
   onlyAdmin,
   onlyAdminOrCoach,
   signIn,
+  logout,
+  me,
+  refresh,
 };

@@ -11,9 +11,11 @@ public class HttpDataDriver implements DataDriver {
 
     private HttpClient client;
     private String apiURL;
+    private String serviceSecret;
 
     public HttpDataDriver(String apiURL) {
         this.apiURL = apiURL;
+        this.serviceSecret = System.getenv("SERVICE_SECRET");
         client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
@@ -33,12 +35,17 @@ public class HttpDataDriver implements DataDriver {
 
     private Document postRequest(String route, String payload) {
         Document doc = null;
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(apiURL+route))
                 .timeout(Duration.ofSeconds(10))
                 .header("Content-Type", "application/json")
-                .method("POST",HttpRequest.BodyPublishers.ofString(payload))
-                .build();
+                .method("POST",HttpRequest.BodyPublishers.ofString(payload));
+
+        if (serviceSecret != null && !serviceSecret.isBlank()) {
+            builder.header("x-service-secret", serviceSecret);
+        }
+
+        HttpRequest request = builder.build();
         try {
             HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
             System.out.println(response.body());

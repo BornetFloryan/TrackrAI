@@ -96,8 +96,8 @@ const isSportif = computed(() => auth.rights?.includes('basic'))
 
 const displayName = computed(() => auth.login || 'Utilisateur')
 
-function logout() {
-  auth.logout()
+async function logout() {
+  await auth.logout()
   router.push('/login')
 }
 

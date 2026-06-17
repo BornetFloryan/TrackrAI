@@ -17,6 +17,9 @@ let UserSchema = new Schema({
   rights: [ {type: String, enum: Config.rights }],
   coach: { type: Schema.Types.ObjectId, ref: 'User' },
   sessionId: {type: String},
+  sessionExpiresAt: { type: Date },
+  refreshToken: { type: String },
+  refreshExpiresAt: { type: Date },
 },{versionKey: false});
 
 

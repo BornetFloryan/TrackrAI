@@ -17,12 +17,12 @@ router.get('/health', (req, res) => res.status(200).send({
   data: { ok: true, uptimeSeconds: Math.round(process.uptime()) },
 }));
 
-router.post('/measure/create', asyncRoute(measureController.create));
+router.post('/measure/create', asyncRoute(authController.verifyServiceSecret), asyncRoute(measureController.create));
 router.patch('/measure/update', asyncRoute(authController.verifyToken), asyncRoute(authController.onlyAdmin), asyncRoute(measureController.update));
 router.get('/measure/get', asyncRoute(authController.verifyToken), asyncRoute(measureController.getMeasures));
 
-router.post('/module/register', asyncRoute(moduleController.register));
-router.post('/module/connection', asyncRoute(moduleController.connection))
+router.post('/module/register', asyncRoute(authController.verifyServiceSecret), asyncRoute(moduleController.register));
+router.post('/module/connection', asyncRoute(authController.verifyServiceSecret), asyncRoute(moduleController.connection))
 router.post('/module/create', asyncRoute(authController.verifyToken), asyncRoute(authController.onlyAdmin), asyncRoute(moduleController.create));
 router.patch('/module/update', asyncRoute(authController.verifyToken), asyncRoute(authController.onlyAdmin), asyncRoute(moduleController.update));
 router.get('/module/get', asyncRoute(authController.verifyToken), asyncRoute(moduleController.getModules));
@@ -32,10 +32,13 @@ router.patch('/user/update', asyncRoute(authController.verifyToken), asyncRoute(
 router.get('/user/getusers', asyncRoute(authController.verifyToken), asyncRoute(authController.onlyAdminOrCoach), asyncRoute(userController.getUsers));
 
 router.post('/auth/signin', asyncRoute(authController.signIn));
+router.post('/auth/refresh', asyncRoute(authController.refresh));
+router.post('/auth/logout', asyncRoute(authController.verifyToken), asyncRoute(authController.logout));
+router.get('/auth/me', asyncRoute(authController.verifyToken), asyncRoute(authController.me));
 
 router.post('/session/start', asyncRoute(authController.verifyToken), asyncRoute(sessionController.start));
 router.post('/session/stop', asyncRoute(authController.verifyToken), asyncRoute(sessionController.stop));
-router.post('/session/active', asyncRoute(sessionController.active));
+router.post('/session/active', asyncRoute(authController.verifyServiceSecret), asyncRoute(sessionController.active));
 router.post('/session/active-for-module', asyncRoute(authController.verifyToken), asyncRoute(sessionController.activeForModule));
 router.get('/session/history', asyncRoute(authController.verifyToken), asyncRoute(sessionController.history));
 

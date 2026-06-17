@@ -51,6 +51,9 @@ def main():
         },
         "model": {
             "samples": pack.get("samples"),
+            "rawSamples": pack.get("rawSamples"),
+            "augmentedSamples": pack.get("augmentedSamples"),
+            "syntheticAugmentation": pack.get("syntheticAugmentation"),
             "validationSamples": pack.get("validationSamples"),
             "metrics": pack.get("metrics"),
             "trainedAt": pack.get("trainedAt")

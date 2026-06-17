@@ -1,6 +1,6 @@
-const { haversineKm, filterGpsTrack } = require('./geo')
+const { haversineKm, filterGpsTrack, gpsQuality } = require('./geo')
 const { measuresOf, lastOf } = require('./measures')
-const { estimateSteps, estimateStress } = require('./physio')
+const { estimateSteps, estimateStress, stepQuality } = require('./physio')
 const { computePerformanceScore } = require('./performanceScore')
 
 function avg(arr) {
@@ -37,6 +37,7 @@ function computeSessionStats(measures) {
     .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon))
 
   const track = filterGpsTrack(rawTrack)
+  const gps = gpsQuality(rawTrack, track)
 
   let distanceKm = 0
   for (let i = 1; i < track.length; i++) {
@@ -50,11 +51,11 @@ function computeSessionStats(measures) {
   const hrAvg = avg(hrVals)
   const hrMax = max(hrVals)
 
-  const steps = estimateSteps(
-    measuresOf(measures, 'acc_x'),
-    measuresOf(measures, 'acc_y'),
-    measuresOf(measures, 'acc_z')
-  )
+  const accX = measuresOf(measures, 'acc_x')
+  const accY = measuresOf(measures, 'acc_y')
+  const accZ = measuresOf(measures, 'acc_z')
+  const steps = estimateSteps(accX, accY, accZ)
+  const stepsQuality = stepQuality(accX, accY, accZ)
 
   const rmssdRaw = lastOf(measures, 'rmssd')
   const rmssd = rmssdRaw != null ? Number(rmssdRaw) : null
@@ -66,6 +67,10 @@ function computeSessionStats(measures) {
     durationMs,
     distanceKm,
     steps,
+    quality: {
+      gps,
+      steps: stepsQuality,
+    },
     hrAvg,
     hrMax,
     stress,

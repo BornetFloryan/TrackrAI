@@ -13,7 +13,7 @@
     <template v-else>
       <div class="grid grid-3">
         <StatCard title="Durée" :value="durationLabel" :sub="dureeSub" />
-        <StatCard title="Distance" :value="distanceLabel" :sub="speedLabel" />
+        <StatCard title="Distance" :value="distanceLabel" :sub="gpsQualityLabel" />
         <StatCard title="Stress" :value="stressLabel" :sub="stressSub" />
       </div>
 
@@ -24,6 +24,9 @@
 
       <div class="card" style="margin-top:1rem;">
         <h3 style="margin:0 0 .5rem 0;">Trace GPS</h3>
+        <p class="muted" style="margin-top:0;">
+          {{ gpsQualityLabel }}
+        </p>
         <GpsMap :points="gpsPoints" />
       </div>
 
@@ -156,6 +159,12 @@ const speedLabel = computed(() => {
   return `Vitesse moy.: ${avg.toFixed(1)} km/h`
 })
 
+const gpsQualityLabel = computed(() => {
+  const gps = stats.value?.quality?.gps
+  if (!gps) return speedLabel.value
+  return `${gps.message} (${gps.confidence}% confiance)`
+})
+
 const stress = computed(() => {
   const hrAvg = hrSeries.value.length ? hrSeries.value.reduce((a, b) => a + (b.value > 0 ? b.value : 0), 0) / Math.max(1, hrSeries.value.filter(x => x.value > 0).length) : null
   let rmssd = null
@@ -179,7 +188,9 @@ const weightLabel = computed(() => {
 })
 
 const stressSub = computed(() =>
-  stats.value.steps ? `Pas estimés: ${stats.value.steps}` : ''
+  stats.value?.quality?.steps
+    ? `Pas: ${stats.value.steps ?? 0} - ${stats.value.quality.steps.message} (${stats.value.quality.steps.confidence}% confiance)`
+    : stats.value?.steps ? `Pas estimés: ${stats.value.steps}` : ''
 )
 
 const dureeSub = computed(() =>

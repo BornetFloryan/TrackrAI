@@ -1,0 +1,668 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{float}
+
+\geometry{margin=2.4cm}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue,
+  citecolor=black
+}
+
+\lstdefinestyle{trackrcode}{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+\setlist[itemize]{noitemsep, topsep=0.25em}
+\setlist[enumerate]{noitemsep, topsep=0.25em}
+\renewcommand{\arraystretch}{1.25}
+
+\title{\textbf{Rapport technique final -- TrackrAI}}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+TrackrAI est une application de suivi sportif destinée à centraliser des données issues de séances physiques, à les visualiser et à fournir des éléments d'analyse au sportif ainsi qu'à son encadrement. L'application associe un module matériel à base d'ESP32, une interface web/mobile, une API, une base de données, un serveur de centralisation et un serveur d'analyse vidéo.
+
+Le contexte principal d'utilisation est le suivi d'une séance d'entraînement réalisée par un sportif. Une séance peut être démarrée depuis l'interface applicative, puis alimentée par un module connecté qui transmet des mesures GPS, inertielles et cardiaques. Les données sont ensuite agrégées, filtrées et transformées en statistiques de séance. Le sportif consulte son historique, ses scores et son coach référent. Le coach consulte les sportifs qui lui sont affectés et peut comparer leurs séances. L'administrateur gère les utilisateurs, les modules et les affectations coach/sportif.
+
+L'application propose également une analyse vidéo de mouvements sportifs. Le flux vidéo est envoyé à un serveur Python par WebSocket, analysé avec MediaPipe/OpenCV, puis stocké dans l'historique. Le squat constitue le mode d'analyse principal. Des modes expérimentaux existent pour le développé couché et le soulevé de terre.
+
+Enfin, un module d'intelligence artificielle produit un score prédictif de séance à partir de statistiques calculées sur l'historique. Le modèle utilisé est un modèle XGBoost entraîné sur les séances disponibles, avec une augmentation synthétique contrôlée afin de stabiliser la démonstration lorsque le volume de données réel reste limité.
+
+\section{Structure logicielle et matérielle globale}
+
+\subsection{Vue d'ensemble}
+
+TrackrAI est organisé en plusieurs services indépendants communiquant par HTTP, TCP, WebSocket et MongoDB. La séparation des responsabilités permet de remplacer ou d'étendre une partie de l'application sans réécrire l'ensemble du système.
+
+\begin{figure}[H]
+\centering
+\begin{verbatim}
+ESP32 + GPS + MPU6050 + ceinture cardio BLE
+        |
+        | TCP : AUTOREGISTER, HELLO, STOREMEASURE
+        v
+Serveur central Java TCP
+        |
+        | HTTP interne sécurisé par x-service-secret
+        v
+API Node.js / Express  <---- HTTP ---- Frontend Vue / Capacitor
+        |                                  |
+        | Mongoose                         | WebSocket
+        v                                  v
+MongoDB                         Serveur analyse vidéo Python
+                                      |
+                                      | TCP : STOREANALYSIS
+                                      v
+                              Serveur central Java
+\end{verbatim}
+\caption{Architecture globale de TrackrAI}
+\end{figure}
+
+\subsection{Composants principaux}
+
+\begin{longtable}{p{3.2cm}p{3.2cm}p{7.2cm}}
+\toprule
+\textbf{Composant} & \textbf{Technologie} & \textbf{Rôle} \\
+\midrule
+Frontend & Vue 3, Vite, Pinia, Chart.js, Leaflet, Capacitor & Interface sportif, coach et administrateur. Il consomme l'API HTTP et envoie les vidéos au serveur d'analyse par WebSocket. \\
+API & Node.js, Express, Mongoose & Expose les routes HTTP, applique l'authentification, contrôle les rôles, écrit et lit les données MongoDB, lance les scripts IA. \\
+Base de données & MongoDB 6 & Stocke les utilisateurs, modules, chipsets, mesures, séances, statistiques et résultats d'analyse vidéo. \\
+Serveur central & Java, sockets TCP, HttpClient & Reçoit les connexions des modules ESP32, gère l'état des sessions côté module et relaie les mesures vers l'API. \\
+Serveur d'analyse & Python, websockets, OpenCV, MediaPipe & Reçoit les vidéos, extrait les poses, calcule des métriques de mouvement et transmet le résultat au serveur central. \\
+Module matériel & ESP32, GPS, MPU6050, BLE HR & Acquiert les mesures physiques et les transmet au serveur central pendant une séance active. \\
+\bottomrule
+\end{longtable}
+
+\section{Contexte logiciel et matériel}
+
+\subsection{Arborescence des sources}
+
+\begin{longtable}{p{4cm}p{10cm}}
+\toprule
+\textbf{Répertoire} & \textbf{Contenu} \\
+\midrule
+\texttt{WebTrackr/} & Application frontend Vue 3. Contient les vues, composants, stores Pinia, services HTTP/WebSocket et configuration Vite/Capacitor. \\
+\texttt{TrackrAPI/} & API Node.js/Express. Contient les contrôleurs, routes, modèles Mongoose, scripts IA et configuration de démarrage. \\
+\texttt{CentralServer/} & Serveur Java TCP et client de test. Contient l'interface \texttt{DataDriver}, les implémentations Mongo/HTTP et la logique de gestion des sockets. \\
+\texttt{AnalyzeServer/} & Serveur Python WebSocket d'analyse vidéo. Contient les analyseurs, le stockage temporaire des vidéos et le client TCP vers le serveur central. \\
+\texttt{arduino/} & Firmware ESP32 PlatformIO. Contient le sketch de connexion WiFi, acquisition GPS/IMU/BLE et envoi TCP des mesures. \\
+\texttt{TrackrAIAcceptanceTests/} & Tests d'acceptation automatisés. \\
+\texttt{docs/} & Documentation de développement, tests et limites techniques. \\
+\texttt{deliverables/} & Checklist technique de rendu. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Prérequis de développement}
+
+\begin{longtable}{p{4cm}p{4cm}p{6cm}}
+\toprule
+\textbf{Outil} & \textbf{Version indicative} & \textbf{Utilisation} \\
+\midrule
+Docker & 24 ou supérieur & Exécution des services en développement et production. \\
+Docker Compose & v2 & Orchestration de MongoDB, API, serveur central, serveur d'analyse et frontend. \\
+Node.js & 20 ou supérieur & Exécution de l'API et du frontend lorsqu'ils ne sont pas conteneurisés. \\
+MongoDB & 6.0 & Base de données principale. \\
+Java & 21 & Compilation et exécution du serveur central. \\
+Python & 3.x & Exécution du serveur d'analyse vidéo et scripts IA. \\
+PlatformIO & Version récente & Compilation et téléversement du firmware ESP32. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Dépendances principales}
+
+\subsubsection{Frontend}
+
+Le frontend utilise Vue 3, Vite, Pinia pour l'état applicatif, Vue Router pour la navigation, Axios pour les appels HTTP, Chart.js pour les graphiques et Leaflet pour les cartes. Capacitor fournit l'enveloppe mobile Android.
+
+\begin{lstlisting}[style=trackrcode]
+cd WebTrackr
+npm install
+npm run dev
+npm run build
+\end{lstlisting}
+
+\subsubsection{API}
+
+L'API utilise Express, Mongoose, bcryptjs, uuid, validator, dotenv et nodemon en développement. Les scripts IA utilisent Python, pandas, scikit-learn, XGBoost et joblib dans l'image Docker de l'API.
+
+\begin{lstlisting}[style=trackrcode]
+cd TrackrAPI
+npm install
+npm run dev
+\end{lstlisting}
+
+\subsubsection{Analyse vidéo}
+
+Le serveur d'analyse vidéo repose sur les bibliothèques Python suivantes :
+
+\begin{lstlisting}[style=trackrcode]
+opencv-python
+mediapipe==0.10.14
+numpy<2
+websockets==12.0
+\end{lstlisting}
+
+\subsection{Lancement par Docker Compose}
+
+Le lancement recommandé en développement se fait à la racine du dépôt :
+
+\begin{lstlisting}[style=trackrcode]
+docker compose -f docker-compose.dev.yml up --build
+\end{lstlisting}
+
+Les services exposés en développement sont :
+
+\begin{longtable}{p{4cm}p{3cm}p{7cm}}
+\toprule
+\textbf{Service} & \textbf{Port} & \textbf{Rôle} \\
+\midrule
+Frontend Vite & 5173 & Interface web de développement. \\
+API Trackr & 4567 & Routes HTTP sous le préfixe \texttt{/trackrapi}. \\
+Serveur central & 29000 vers 9000 & Point d'entrée TCP pour les modules ESP32. \\
+Serveur analyse & 6000 & WebSocket pour l'upload et l'analyse vidéo. \\
+MongoDB & 27017 & Base de données accessible localement. \\
+\bottomrule
+\end{longtable}
+
+Les variables d'environnement principales sont :
+
+\begin{longtable}{p{5cm}p{9cm}}
+\toprule
+\textbf{Variable} & \textbf{Description} \\
+\midrule
+\texttt{MONGODB\_URL} & URL de connexion MongoDB. \\
+\texttt{PORT} & Port HTTP de l'API. \\
+\texttt{CENTRAL\_HOST}, \texttt{CENTRAL\_PORT} & Adresse du serveur central depuis les services internes. \\
+\texttt{SERVICE\_SECRET} & Secret partagé utilisé par les appels internes Java/API. \\
+\texttt{USER\_ACCESS\_TOKEN\_TTL\_MINUTES} & Durée de validité de l'access token utilisateur. \\
+\texttt{USER\_REFRESH\_TOKEN\_TTL\_DAYS} & Durée de validité du refresh token utilisateur. \\
+\texttt{WS\_HOST}, \texttt{WS\_PORT} & Adresse d'écoute du serveur WebSocket d'analyse vidéo. \\
+\texttt{MAX\_VIDEO\_BYTES} & Taille maximale d'une vidéo reçue par le serveur d'analyse. \\
+\bottomrule
+\end{longtable}
+
+\section{Descriptif technique}
+
+\subsection{Frontend Vue / Capacitor}
+
+\subsubsection{Organisation}
+
+Le répertoire \texttt{WebTrackr/src} contient les vues, composants, services et stores. Les services isolent les communications HTTP et WebSocket. Les stores Pinia conservent l'état de session utilisateur, les droits, l'identité du sportif et les données nécessaires aux pages.
+
+\begin{longtable}{p{5cm}p{9cm}}
+\toprule
+\textbf{Élément} & \textbf{Rôle} \\
+\midrule
+\texttt{views/} & Pages principales : tableau de bord sportif, historique, détail séance, administration, coach, analyse vidéo. \\
+\texttt{components/} & Composants réutilisables : navigation, graphiques, cartes statistiques. \\
+\texttt{services/api.service.js} & Client Axios, ajout de l'access token, refresh automatique sur réponse 401. \\
+\texttt{services/auth.service.js} & Connexion, déconnexion, refresh token et vérification de session. \\
+\texttt{services/analysis.ws.js} & Connexion WebSocket au serveur d'analyse vidéo. \\
+\texttt{store/auth.store.js} & Stockage de l'identité utilisateur, des droits, de l'access token et du refresh token. \\
+\texttt{router/index.js} & Routes frontend et gardes de navigation par rôle. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Gestion des rôles côté interface}
+
+Trois profils sont représentés :
+
+\begin{itemize}
+  \item \textbf{sportif} : consultation du tableau de bord, lancement de séance, historique, analyse vidéo ;
+  \item \textbf{coach} : consultation des sportifs suivis, comparaison, accès aux analyses du périmètre affecté ;
+  \item \textbf{administrateur} : gestion des utilisateurs, modules et affectations coach/sportif.
+\end{itemize}
+
+Les gardes Vue Router empêchent l'accès aux pages non compatibles avec le rôle local. La sécurité effective reste appliquée côté API.
+
+\subsubsection{Gestion des tokens}
+
+Le frontend conserve deux jetons :
+
+\begin{itemize}
+  \item un access token court, envoyé dans l'en-tête \texttt{x-session-id} ;
+  \item un refresh token long, utilisé uniquement sur \texttt{POST /auth/refresh}.
+\end{itemize}
+
+Lorsqu'une requête API renvoie \texttt{401}, le client Axios tente un refresh. Si le refresh réussit, l'access token est remplacé et la requête initiale est rejouée. Si le refresh échoue, les données locales d'authentification sont supprimées et l'utilisateur est redirigé vers la page de connexion.
+
+\subsection{API Node.js / Express}
+
+\subsubsection{Organisation}
+
+L'API est organisée selon une structure classique routes/contrôleurs/modèles :
+
+\begin{longtable}{p{5cm}p{9cm}}
+\toprule
+\textbf{Répertoire} & \textbf{Rôle} \\
+\midrule
+\texttt{routes/} & Déclaration des routes HTTP sous le préfixe \texttt{/trackrapi}. \\
+\texttt{controllers/} & Logique métier : authentification, utilisateurs, modules, mesures, séances, IA. \\
+\texttt{models/} & Modèles Mongoose correspondant aux collections MongoDB. \\
+\texttt{utils/} & Calculs statistiques : distance GPS, pas, stress, score de performance. \\
+\texttt{ai/} & Scripts Python d'entraînement et de prédiction. \\
+\texttt{services/} & Appels TCP vers le serveur central, exécution des scripts IA, surveillance de sessions. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Format de réponse}
+
+Les réponses API suivent le format :
+
+\begin{lstlisting}[style=trackrcode]
+{
+  "error": 0,
+  "status": 200,
+  "data": { ... }
+}
+\end{lstlisting}
+
+Une valeur \texttt{error} différente de zéro indique une erreur applicative. Le champ \texttt{status} reprend le statut HTTP attendu et \texttt{data} contient les données ou le message d'erreur.
+
+\subsubsection{Authentification et sécurité}
+
+L'authentification repose sur un couple access token / refresh token :
+
+\begin{itemize}
+  \item \texttt{POST /auth/signin} vérifie le mot de passe avec bcrypt et crée les deux jetons ;
+  \item l'access token est stocké en base dans le champ \texttt{sessionId} ;
+  \item le refresh token est stocké en base dans le champ \texttt{refreshToken} ;
+  \item chaque jeton possède une date d'expiration ;
+  \item \texttt{POST /auth/refresh} remplace les deux jetons, ce qui invalide l'ancien refresh token ;
+  \item \texttt{POST /auth/logout} supprime les deux jetons en base.
+\end{itemize}
+
+Les routes internes appelées par le serveur central sont protégées par l'en-tête \texttt{x-service-secret}. Cette protection évite qu'une écriture de mesure ou un auto-enregistrement de module soit accepté depuis un client HTTP externe non autorisé.
+
+\subsubsection{Routes principales}
+
+\begin{longtable}{p{2cm}p{4.8cm}p{3cm}p{5cm}}
+\toprule
+\textbf{Méthode} & \textbf{Chemin} & \textbf{Protection} & \textbf{Rôle} \\
+\midrule
+GET & \texttt{/health} & publique & Vérification de disponibilité de l'API. \\
+POST & \texttt{/auth/signin} & publique & Connexion utilisateur. \\
+POST & \texttt{/auth/refresh} & refresh token & Renouvellement des jetons. \\
+POST & \texttt{/auth/logout} & access token & Déconnexion serveur. \\
+GET & \texttt{/auth/me} & access token & Lecture de la session courante. \\
+POST & \texttt{/measure/create} & service secret & Création de mesure depuis le serveur central. \\
+PATCH & \texttt{/measure/update} & admin & Mise à jour d'une mesure. \\
+GET & \texttt{/measure/get} & access token & Lecture filtrée des mesures. \\
+POST & \texttt{/module/register} & service secret & Auto-enregistrement d'un module matériel. \\
+POST & \texttt{/module/connection} & service secret & Mise à jour de l'état de connexion module. \\
+POST & \texttt{/module/create} & admin & Création administrative d'un module. \\
+PATCH & \texttt{/module/update} & admin & Modification administrative d'un module. \\
+GET & \texttt{/module/get} & access token & Liste des modules. \\
+POST & \texttt{/user/create} & admin & Création utilisateur. \\
+PATCH & \texttt{/user/update} & admin & Modification utilisateur et affectation coach. \\
+GET & \texttt{/user/getusers} & admin/coach & Liste des utilisateurs selon périmètre. \\
+POST & \texttt{/session/start} & access token & Démarrage d'une séance. \\
+POST & \texttt{/session/stop} & access token & Arrêt d'une séance et calcul des statistiques. \\
+POST & \texttt{/session/active} & service secret & Vérification interne d'une session active. \\
+POST & \texttt{/session/active-for-module} & access token & Vérification frontend d'un module actif. \\
+GET & \texttt{/session/history} & access token & Historique filtré par rôle. \\
+GET & \texttt{/analysis} & access token & Historique filtré des analyses vidéo. \\
+GET & \texttt{/analysis/:analysisId} & access token & Détail d'une analyse vidéo. \\
+POST & \texttt{/ai/train} & admin & Ré-entraînement du modèle IA. \\
+GET & \texttt{/ai/predict/:sessionId} & access token & Prédiction IA pour une séance accessible. \\
+GET & \texttt{/ai/insights/:sessionId} & access token & Explications IA d'une séance accessible. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Base de données MongoDB}
+
+\subsubsection{Collections}
+
+\begin{longtable}{p{3.2cm}p{10.8cm}}
+\toprule
+\textbf{Collection} & \textbf{Description} \\
+\midrule
+\texttt{users} & Utilisateurs de l'application. Contient login, mot de passe hashé, email, droits, coach référent, access token, refresh token et dates d'expiration. \\
+\texttt{modules} & Modules matériels enregistrés. Contient nom, surnom, clé unique, type de microcontrôleur, chipsets, état connecté et date de dernière activité. \\
+\texttt{chipsets} & Déclaration des capteurs ou composants associés aux modules. \\
+\texttt{sessions} & Séances sportives. Lie un utilisateur, un module, les dates de début/fin, la dernière mesure reçue et les statistiques calculées. \\
+\texttt{measures} & Mesures unitaires. Contient type, date, valeur textuelle, module, séance et éventuellement identifiant d'analyse vidéo. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Relations}
+
+\begin{itemize}
+  \item Une séance référence un utilisateur et un module.
+  \item Une mesure référence une séance et éventuellement un module.
+  \item Un module référence plusieurs chipsets.
+  \item Un sportif référence au plus un coach.
+  \item Un coach peut être référencé par plusieurs sportifs.
+\end{itemize}
+
+\subsection{Serveur central Java}
+
+\subsubsection{Rôle}
+
+Le serveur central Java est le point d'entrée des modules matériels. Il écoute des connexions TCP persistantes, gère l'identification des modules et transmet les mesures vers l'API. Il permet également à l'API de demander le démarrage ou l'arrêt d'une séance sur un module connecté.
+
+\subsubsection{Organisation}
+
+\begin{longtable}{p{5cm}p{9cm}}
+\toprule
+\textbf{Fichier} & \textbf{Rôle} \\
+\midrule
+\texttt{DataDriver.java} & Interface décrivant les opérations de stockage, enregistrement module, état session et connexion. \\
+\texttt{HttpDataDriver.java} & Implémentation qui transmet les opérations à l'API HTTP. Ajoute le secret de service dans l'en-tête \texttt{x-service-secret}. \\
+\texttt{MongoDataDriver.java} & Implémentation historique d'accès direct à MongoDB. \\
+\texttt{ThreadServer.java} & Gestion d'une connexion TCP module, parsing des commandes et état local de session. \\
+\texttt{MainServer.java} & Démarrage du serveur TCP. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Protocole TCP}
+
+Les commandes principales sont :
+
+\begin{longtable}{p{4cm}p{10cm}}
+\toprule
+\textbf{Commande} & \textbf{Description} \\
+\midrule
+\texttt{AUTOREGISTER uc chipsets...} & Demande d'enregistrement automatique d'un module. \\
+\texttt{HELLO moduleKey} & Identification d'un module déjà enregistré. \\
+\texttt{STOREMEASURE type date value moduleKey} & Envoi d'une mesure pendant une séance active. \\
+\texttt{STOREANALYSIS type date value} & Envoi d'un résultat d'analyse vidéo sérialisé. \\
+\texttt{START\_SESSION sessionId} & Commande envoyée au module pour démarrer l'acquisition. \\
+\texttt{STOP\_SESSION} & Commande envoyée au module pour arrêter l'acquisition. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Module ESP32}
+
+\subsubsection{Matériel}
+
+Le module matériel est construit autour d'un ESP32. Il utilise :
+
+\begin{itemize}
+  \item un GPS connecté sur l'UART matériel 2, avec réception sur la broche GPIO 27 ;
+  \item un MPU6050 connecté en I2C, avec SDA sur GPIO 19 et SCL sur GPIO 22 ;
+  \item une ceinture cardiaque Bluetooth Low Energy exposant le service Heart Rate \texttt{180D} et la caractéristique \texttt{2A37} ;
+  \item le bouton BOOT de l'ESP32 pour une réinitialisation de configuration après maintien prolongé.
+\end{itemize}
+
+\subsubsection{Bibliothèques embarquées}
+
+Le firmware PlatformIO utilise notamment :
+
+\begin{itemize}
+  \item \texttt{WiFiManager} pour la configuration WiFi et l'adresse du serveur ;
+  \item \texttt{MPU6050} pour l'accéléromètre et le gyroscope ;
+  \item \texttt{NeoGPS} pour la lecture GPS ;
+  \item les bibliothèques BLE de l'ESP32 pour la ceinture cardiaque ;
+  \item \texttt{Preferences} pour stocker l'adresse serveur et la clé module en mémoire flash.
+\end{itemize}
+
+\subsubsection{Fonctionnement}
+
+Au démarrage, le module charge la configuration stockée. Si aucune configuration WiFi ou serveur n'existe, un point d'accès \texttt{Trackr-ESP32} est ouvert par WiFiManager afin de saisir l'adresse et le port du serveur central. La clé du module est conservée en mémoire flash après auto-enregistrement.
+
+Une fois connecté au serveur central, le module envoie \texttt{AUTOREGISTER} si nécessaire, puis \texttt{HELLO}. Les mesures ne sont envoyées que lorsque le serveur central transmet une commande de démarrage de séance. Les données GPS sont filtrées côté module avec une distance minimale, une vitesse minimale et un intervalle minimal entre deux positions. Les données d'accéléromètre sont envoyées après une phase de stabilisation du MPU6050. La fréquence d'envoi est d'environ une seconde.
+
+\subsection{Calcul des statistiques de séance}
+
+Les statistiques de séance sont calculées à l'arrêt de la séance à partir des mesures enregistrées. Les fonctions principales sont dans \texttt{TrackrAPI/utils}.
+
+\begin{longtable}{p{4cm}p{10cm}}
+\toprule
+\textbf{Fichier} & \textbf{Rôle} \\
+\midrule
+\texttt{geo.js} & Calcul de distance par Haversine, filtrage des points GPS aberrants et indicateur de qualité GPS. \\
+\texttt{physio.js} & Estimation des pas à partir de l'accélération, calcul de stress, qualité du comptage de pas. \\
+\texttt{sessionStats.js} & Agrégation globale d'une séance : distance, vitesse, fréquence cardiaque, pas, stress, score et qualité. \\
+\texttt{performanceScore.js} & Calcul du score de performance de référence. \\
+\bottomrule
+\end{longtable}
+
+Les mesures GPS et accéléromètre restent dépendantes du matériel et de son placement. Pour cette raison, la séance contient également des indicateurs de qualité qui signalent si la trace GPS ou le comptage de pas sont exploitables, partiellement bruités ou peu fiables.
+
+\subsection{Serveur d'analyse vidéo Python}
+
+\subsubsection{Flux d'analyse}
+
+Le serveur d'analyse reçoit la vidéo par WebSocket. Le protocole est constitué de trois messages principaux :
+
+\begin{enumerate}
+  \item \texttt{START\_ANALYSIS} : initialise l'analyse, précise l'exercice et l'utilisateur ;
+  \item \texttt{VIDEO\_CHUNK} : transmet la vidéo encodée en base64 ;
+  \item \texttt{END\_ANALYSIS} : finalise le fichier temporaire et lance l'analyse.
+\end{enumerate}
+
+Après analyse, le résultat est renvoyé au client puis transmis au serveur central avec \texttt{STOREANALYSIS}. Le serveur central le relaie ensuite vers l'API, qui le stocke dans la collection \texttt{measures} avec un \texttt{analysisId}.
+
+\subsubsection{Organisation}
+
+\begin{longtable}{p{5cm}p{9cm}}
+\toprule
+\textbf{Fichier} & \textbf{Rôle} \\
+\midrule
+\texttt{ws\_server.py} & Serveur WebSocket, réception des messages, orchestration de l'analyse. \\
+\texttt{pose\_extractor.py} & Extraction des landmarks MediaPipe sur les frames échantillonnées. \\
+\texttt{metrics.py} & Fonctions géométriques : conversion en coordonnées, calcul d'angle, lissage. \\
+\texttt{analyzer\_registry.py} & Sélection de l'analyseur selon l'exercice demandé. \\
+\texttt{squat\_analyzer.py} & Analyse principale du squat. \\
+\texttt{bench\_analyzer.py} & Analyse expérimentale du développé couché. \\
+\texttt{deadlift\_analyzer.py} & Analyse expérimentale du soulevé de terre. \\
+\texttt{central\_tcp\_client.py} & Envoi du résultat d'analyse au serveur central. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Métriques vidéo}
+
+Le squat est évalué à partir des angles des genoux, de l'inclinaison du buste et de la différence gauche/droite. Les répétitions sont détectées par transition entre une position haute et une position basse. Le développé couché expérimental s'appuie sur les angles des coudes. Le soulevé de terre expérimental s'appuie sur l'extension de hanche.
+
+Les modes expérimentaux dépendent fortement de l'angle de caméra, de la stabilité de l'image et de la visibilité des articulations. Ils constituent une extension fonctionnelle du système, mais nécessitent une validation sur davantage de vidéos avant un usage fiable.
+
+\subsection{Intelligence artificielle}
+
+\subsubsection{Objectif}
+
+Le module IA prédit un score global de séance à partir de statistiques calculées. Il ne remplace pas le score déterministe, mais fournit une estimation entraînée sur l'historique disponible.
+
+\subsubsection{Modèle utilisé}
+
+Le modèle utilisé est \texttt{XGBRegressor}. Ce choix est adapté à un jeu de données tabulaire de taille réduite, avec peu de caractéristiques numériques et un besoin de prédiction rapide. XGBoost gère correctement les relations non linéaires sans nécessiter un volume massif de données comme un réseau de neurones profond.
+
+Les caractéristiques utilisées sont :
+
+\begin{itemize}
+  \item \texttt{distanceKm} ;
+  \item \texttt{hrAvg} ;
+  \item \texttt{stress} ;
+  \item \texttt{durationMs} ;
+  \item \texttt{steps}.
+\end{itemize}
+
+La cible d'entraînement est le score global déjà calculé dans les statistiques de séance.
+
+\subsubsection{Entraînement}
+
+Le script \texttt{TrackrAPI/ai/train\_model.py} charge les séances possédant un score global. Si moins de dix lignes exploitables sont disponibles, l'entraînement est refusé. Une augmentation synthétique contrôlée est appliquée par bruit faible autour des séances réelles. Cette augmentation stabilise le modèle pour la démonstration, mais elle ne remplace pas un vrai jeu de données multi-athlètes annoté.
+
+Un exemple d'entraînement validé dans l'environnement Docker produit :
+
+\begin{lstlisting}[style=trackrcode]
+rawSamples: 21
+augmentedSamples: 126
+samples: 147
+augmentationFactor: 6
+syntheticAugmentation: true
+\end{lstlisting}
+
+Les métriques sauvegardées sont la MAE, la RMSE et le $R^2$ sur une séparation entraînement/validation. Ces métriques doivent être interprétées avec prudence en raison du faible volume de données réelles.
+
+\subsubsection{Prédiction}
+
+Le script \texttt{predict\_session.py} reçoit un identifiant de séance, charge le modèle \texttt{model.joblib}, extrait les caractéristiques de la séance et renvoie :
+
+\begin{itemize}
+  \item le score prédit ;
+  \item une confiance indicative ;
+  \item les caractéristiques utilisées ;
+  \item les métadonnées d'entraînement du modèle.
+\end{itemize}
+
+\section{Sécurité applicative}
+
+\subsection{Contrôle d'accès}
+
+Les accès sont filtrés à deux niveaux. Le frontend masque les pages non compatibles avec le rôle utilisateur, puis l'API vérifie systématiquement les droits avant d'accéder aux données sensibles.
+
+Les règles principales sont :
+
+\begin{itemize}
+  \item un sportif consulte uniquement ses propres séances, mesures et analyses ;
+  \item un coach consulte les données des sportifs qui lui sont affectés ;
+  \item un administrateur consulte et modifie l'ensemble des utilisateurs et modules ;
+  \item les routes de création de mesures et d'enregistrement module exigent un secret de service ;
+  \item l'entraînement IA est réservé à l'administrateur.
+\end{itemize}
+
+\subsection{Gestion access token / refresh token}
+
+Le système d'authentification utilise deux jetons. L'access token est court et transmis dans les requêtes courantes. Le refresh token est plus long et permet d'obtenir un nouvel access token sans nouvelle saisie du mot de passe. Lors d'un refresh, le refresh token est également renouvelé, ce qui invalide l'ancien jeton. La déconnexion supprime les deux jetons côté serveur.
+
+En environnement de démonstration, les durées sont :
+
+\begin{itemize}
+  \item access token : 15 minutes ;
+  \item refresh token : 7 jours.
+\end{itemize}
+
+\section{Procédures d'exploitation}
+
+\subsection{Installation et lancement}
+
+La procédure recommandée est :
+
+\begin{lstlisting}[style=trackrcode]
+git clone <depot-trackrai>
+cd TrackrAI
+docker compose -f docker-compose.dev.yml up --build
+\end{lstlisting}
+
+Le frontend est disponible sur \url{http://localhost:5173}. L'API est disponible sur \url{http://localhost:4567/trackrapi}. Le serveur central TCP est exposé sur le port \texttt{29000}.
+
+\subsection{Arrêt}
+
+\begin{lstlisting}[style=trackrcode]
+docker compose -f docker-compose.dev.yml down
+\end{lstlisting}
+
+La suppression du volume MongoDB, utile pour repartir d'une base vide, se fait avec :
+
+\begin{lstlisting}[style=trackrcode]
+docker compose -f docker-compose.dev.yml down -v
+\end{lstlisting}
+
+\subsection{Tests}
+
+Les tests manuels prioritaires sont :
+
+\begin{enumerate}
+  \item connexion administrateur et affectation d'un coach à un sportif ;
+  \item connexion coach et vérification du filtre \og mes sportifs \fg{} ;
+  \item connexion sportif et vérification du coach référent ;
+  \item démarrage et arrêt d'une séance avec un module ESP32 ;
+  \item upload d'une vidéo et consultation de l'analyse dans l'historique ;
+  \item vérification des indicateurs de qualité GPS/pas sur une nouvelle séance.
+\end{enumerate}
+
+Les tests d'acceptation peuvent être lancés par :
+
+\begin{lstlisting}[style=trackrcode]
+cd TrackrAIAcceptanceTests
+mvn test
+\end{lstlisting}
+
+\section{Limites et perspectives}
+
+\subsection{Capteurs}
+
+Le GPS et l'accéléromètre restent sensibles au matériel, à l'environnement et au placement du module. Les filtres appliqués réduisent les points incohérents et fournissent un indicateur de qualité, mais ils ne transforment pas le module en dispositif de mesure scientifique.
+
+\subsection{Analyse vidéo}
+
+Le squat est le mode le plus fiable. Les modes développé couché et soulevé de terre sont fonctionnels mais expérimentaux. Une amélioration future consiste à constituer un jeu de vidéos annotées, à valider les seuils par morphologie et à intégrer plusieurs angles de caméra.
+
+\subsection{Intelligence artificielle}
+
+Le dataset réel reste réduit. L'augmentation synthétique améliore la stabilité de la démonstration, mais un modèle sportif généraliste demanderait davantage de séances réelles, davantage d'athlètes et des annotations fiables. Une extension possible est l'intégration d'un assistant LLM de génération de programmes personnalisés utilisant l'historique des séances, la fatigue, la récupération, les objectifs et les résultats vidéo.
+
+\subsection{Sécurité et production}
+
+Les secrets présents dans les fichiers Docker Compose sont adaptés à une démonstration. En production, ils doivent être injectés par un gestionnaire de secrets ou des variables d'environnement non versionnées. L'ajout d'une journalisation centralisée, d'une rotation de secrets et d'une politique CORS plus stricte constitue également une amélioration naturelle.
+
+\section{Annexes}
+
+\subsection{Résumé des ports}
+
+\begin{longtable}{p{4cm}p{3cm}p{7cm}}
+\toprule
+\textbf{Service} & \textbf{Port dev} & \textbf{Description} \\
+\midrule
+Frontend & 5173 & Interface Vite. \\
+API & 4567 & API HTTP Express. \\
+Serveur central & 29000 & Port TCP exposé pour les modules. \\
+Analyse vidéo & 6000 & WebSocket d'analyse. \\
+MongoDB & 27017 & Base de données. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Schéma électrique minimal}
+
+\begin{longtable}{p{4cm}p{4cm}p{6cm}}
+\toprule
+\textbf{Élément} & \textbf{Connexion ESP32} & \textbf{Rôle} \\
+\midrule
+GPS & RX sur GPIO 27 & Réception des trames NMEA. \\
+MPU6050 & SDA GPIO 19, SCL GPIO 22 & Accélération et gyroscope. \\
+Ceinture cardio BLE & Bluetooth Low Energy & Fréquence cardiaque et intervalles RR. \\
+Bouton BOOT & GPIO 0 & Réinitialisation longue de la configuration. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Liens utiles}
+
+\begin{itemize}
+  \item Documentation Docker : \url{https://docs.docker.com/}
+  \item Documentation Vue : \url{https://vuejs.org/}
+  \item Documentation Express : \url{https://expressjs.com/}
+  \item Documentation MongoDB : \url{https://www.mongodb.com/docs/}
+  \item Documentation MediaPipe : \url{https://developers.google.com/mediapipe}
+  \item Documentation XGBoost : \url{https://xgboost.readthedocs.io/}
+  \item Documentation PlatformIO : \url{https://docs.platformio.org/}
+\end{itemize}
+
+\end{document}
