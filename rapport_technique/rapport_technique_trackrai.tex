@@ -53,7 +53,7 @@ Le contexte principal d'utilisation est le suivi d'une séance d'entraînement r
 
 L'application propose également une analyse vidéo de mouvements sportifs. Le flux vidéo est envoyé à un serveur Python par WebSocket, analysé avec MediaPipe/OpenCV, puis stocké dans un historique intégré à la page d'analyse vidéo. Le squat constitue le mode d'analyse principal. Des modes expérimentaux existent pour le développé couché et le soulevé de terre.
 
-Enfin, un module d'intelligence artificielle produit un score prédictif de séance à partir de statistiques calculées sur l'historique. Le modèle utilisé est un modèle XGBoost entraîné sur les séances disponibles, avec une augmentation synthétique contrôlée afin de stabiliser la démonstration lorsque le volume de données réel reste limité.
+Enfin, un module d'intelligence artificielle produit un score prédictif de séance à partir de statistiques calculées sur l'historique. L'objectif fonctionnel est de tendre vers un suivi qui s'adapte progressivement au sportif au fur et à mesure des séances enregistrées. Dans l'état actuel, cette adaptation est réalisée par un modèle XGBoost ré-entraînable sur les séances disponibles, avec une augmentation synthétique contrôlée afin de stabiliser la démonstration lorsque le volume de données réel reste limité.
 
 \section{Structure logicielle et matérielle globale}
 
@@ -104,6 +104,8 @@ Module matériel & ESP32, GPS, MPU6050, BLE HR & Acquiert les mesures physiques,
 
 \subsection{Arborescence des sources}
 
+Les sources sont versionnées dans le dépôt Git de l'application. Une reprise du projet se fait en clonant ce dépôt, puis en utilisant les fichiers Docker Compose et les guides de lancement fournis à la racine. Les répertoires principaux sont :
+
 \begin{longtable}{p{4cm}p{10cm}}
 \toprule
 \textbf{Répertoire} & \textbf{Contenu} \\
@@ -139,7 +141,7 @@ PlatformIO & Version récente & Compilation et téléversement du firmware ESP32
 
 \subsubsection{Frontend}
 
-Le frontend utilise Vue 3, Vite, Pinia pour l'état applicatif, Vue Router pour la navigation, Axios pour les appels HTTP, Chart.js pour les graphiques et Leaflet pour les cartes. Capacitor fournit l'enveloppe mobile Android.
+Le frontend utilise Vue 3, Vite, Pinia pour l'état applicatif, Vue Router pour la navigation, Axios pour les appels HTTP, Chart.js pour les graphiques et Leaflet pour les cartes. Capacitor fournit l'enveloppe mobile Android. En développement, l'interface est servie par Vite. En production, le build statique est servi par un conteneur Nginx qui joue également le rôle de reverse proxy vers l'API Node et le serveur WebSocket d'analyse vidéo.
 
 \begin{lstlisting}[style=trackrcode]
 cd WebTrackr
@@ -171,7 +173,7 @@ websockets==12.0
 
 \subsection{Lancement par Docker Compose}
 
-Le lancement recommandé en développement se fait à la racine du dépôt :
+Le lancement recommandé en développement se fait à la racine du dépôt. Cette commande construit les images locales si nécessaire, installe les dépendances dans les conteneurs et démarre l'ensemble des services applicatifs :
 
 \begin{lstlisting}[style=trackrcode]
 docker compose -f docker-compose.dev.yml up --build
@@ -190,6 +192,18 @@ Serveur analyse & 6000 & WebSocket pour l'upload et l'analyse vidéo. \\
 MongoDB & 27017 & Base de données accessible localement. \\
 \bottomrule
 \end{longtable}
+
+Pour un lancement de production local, le fichier \texttt{docker-compose.yml} construit le frontend puis le sert avec Nginx. L'API, le serveur central, le serveur d'analyse et MongoDB restent isolés dans le réseau Docker :
+
+\begin{lstlisting}[style=trackrcode]
+docker compose -f docker-compose.yml up --build -d
+\end{lstlisting}
+
+L'arrêt de la pile de production locale se fait par :
+
+\begin{lstlisting}[style=trackrcode]
+docker compose -f docker-compose.yml down
+\end{lstlisting}
 
 Les variables d'environnement principales sont :
 
@@ -358,6 +372,22 @@ Une documentation Swagger est servie directement par l'API via \texttt{/trackrap
 \bottomrule
 \end{longtable}
 
+\subsubsection{Structure des documents}
+
+Les modèles Mongoose du répertoire \texttt{TrackrAPI/models} décrivent les documents stockés. Les champs principaux sont :
+
+\begin{longtable}{p{3.2cm}p{10.8cm}}
+\toprule
+\textbf{Collection} & \textbf{Champs principaux} \\
+\midrule
+\texttt{users} & \texttt{login}, \texttt{password} hashé, \texttt{email}, \texttt{rights}, \texttt{coach}, \texttt{sessionId}, \texttt{sessionExpiresAt}, \texttt{refreshToken}, \texttt{refreshExpiresAt}. Le champ \texttt{coach} référence un utilisateur possédant le rôle coach. \\
+\texttt{modules} & \texttt{name}, \texttt{shortName}, \texttt{key}, \texttt{uc}, \texttt{chipsets}, \texttt{connected}, \texttt{lastSeen}. La clé \texttt{key} identifie le module côté TCP. \\
+\texttt{chipsets} & \texttt{name}, \texttt{description}, \texttt{links}, \texttt{caps}. Les capacités décrivent les types de mesures ou fonctions disponibles. \\
+\texttt{sessions} & \texttt{sessionId}, \texttt{user}, \texttt{module}, \texttt{startDate}, \texttt{lastMeasureAt}, \texttt{lastHeartRateAt}, \texttt{endDate}, \texttt{stats}. Les statistiques agrégées sont stockées dans \texttt{stats}. \\
+\texttt{measures} & \texttt{type}, \texttt{date}, \texttt{value}, \texttt{module}, \texttt{session}, \texttt{analysisId}. La valeur reste une chaîne afin d'accepter des mesures hétérogènes. \\
+\bottomrule
+\end{longtable}
+
 \subsubsection{Relations}
 
 \begin{itemize}
@@ -494,7 +524,7 @@ Les modes expérimentaux dépendent fortement de l'angle de caméra, de la stabi
 
 \subsubsection{Objectif}
 
-Le module IA prédit un score global de séance à partir de statistiques calculées. Il ne remplace pas le score déterministe, mais fournit une estimation entraînée sur l'historique disponible.
+Le module IA prédit un score global de séance à partir de statistiques calculées. Il ne remplace pas le score déterministe, mais fournit une estimation entraînée sur l'historique disponible. L'objectif produit est que l'évaluation devienne progressivement plus représentative du sportif suivi lorsque de nouvelles séances sont ajoutées à la base. Le système actuel met en place cette base technique avec un modèle ré-entraînable et des conseils simples de récupération ; il ne constitue pas encore un générateur autonome de programmes d'entraînement personnalisés.
 
 \subsubsection{Modèle utilisé}
 
@@ -514,7 +544,7 @@ La cible d'entraînement est le score global déjà calculé dans les statistiqu
 
 \subsubsection{Entraînement}
 
-Le script \texttt{TrackrAPI/ai/train\_model.py} charge les séances possédant un score global. Si moins de dix lignes exploitables sont disponibles, l'entraînement est refusé. Une augmentation synthétique contrôlée est appliquée par bruit faible autour des séances réelles. Cette augmentation stabilise le modèle pour la démonstration, mais elle ne remplace pas un vrai jeu de données multi-athlètes annoté.
+Le script \texttt{TrackrAPI/ai/train\_model.py} charge les séances possédant un score global. Si moins de dix lignes exploitables sont disponibles, l'entraînement est refusé. Une augmentation synthétique contrôlée est appliquée par bruit faible autour des séances réelles. Cette augmentation stabilise le modèle pour la démonstration, mais elle ne remplace pas un vrai jeu de données multi-athlètes annoté. Le ré-entraînement permet d'intégrer les nouvelles séances et donc de faire évoluer le modèle avec l'historique collecté, ce qui correspond au premier niveau d'adaptation progressive au sportif.
 
 Un exemple d'entraînement validé dans l'environnement Docker produit :
 
@@ -598,7 +628,7 @@ La base initialisée par l'API contient plusieurs comptes de test permettant de 
 
 \subsection{Intégration continue GitLab / Jenkins}
 
-Le dépôt contient une configuration d'intégration continue sous deux formes : un fichier \texttt{.gitlab-ci.yml} pour GitLab CI et un \texttt{Jenkinsfile} pour Jenkins. Les deux s'appuient sur \texttt{docker-compose.ci.yml} afin de valider la configuration Docker, construire les images applicatives et lancer les vérifications automatisées dans un environnement reproductible. La documentation complémentaire est conservée dans \texttt{docs/CI\_GITLAB\_JENKINS.md}. Dans un déploiement réel, les secrets utilisés par la CI doivent être déplacés dans les variables protégées GitLab ou Jenkins.
+Le versioning est réalisé sur le serveur GitLab du département. L'intégration continue est prévue sur Jenkins à partir du \texttt{Jenkinsfile} présent à la racine du dépôt. Le dépôt contient également un fichier \texttt{.gitlab-ci.yml}, utile si un runner GitLab Docker est disponible. Les pipelines s'appuient sur \texttt{docker-compose.ci.yml} afin de valider la configuration Docker, construire les images applicatives et lancer les vérifications automatisées dans un environnement reproductible. La documentation complémentaire est conservée dans \texttt{docs/CI\_GITLAB\_JENKINS.md}. Dans un déploiement réel, les secrets utilisés par la CI doivent être déplacés dans les variables protégées GitLab ou Jenkins.
 
 \subsection{Tests}
 
@@ -632,7 +662,7 @@ Le squat est le mode le plus fiable. Les modes développé couché et soulevé d
 
 \subsection{Intelligence artificielle}
 
-Le dataset réel reste réduit. L'augmentation synthétique améliore la stabilité de la démonstration, mais un modèle sportif généraliste demanderait davantage de séances réelles, davantage d'athlètes et des annotations fiables. Une extension possible est l'intégration d'un assistant LLM de génération de programmes personnalisés utilisant l'historique des séances, la fatigue, la récupération, les objectifs et les résultats vidéo.
+Le dataset réel reste réduit. L'augmentation synthétique améliore la stabilité de la démonstration, mais un modèle sportif généraliste demanderait davantage de séances réelles, davantage d'athlètes et des annotations fiables. Le système actuel exploite l'historique pour prédire et expliquer une séance ; la personnalisation complète de l'entraînement reste une perspective. Une extension possible est l'intégration d'un assistant LLM de génération de programmes personnalisés utilisant l'historique des séances, la fatigue, la récupération, les objectifs et les résultats vidéo.
 
 \subsection{Sécurité et production}
 
@@ -680,7 +710,4 @@ Bouton BOOT & GPIO 0 & Réinitialisation longue de la configuration. \\
 \end{itemize}
 
 \end{document}
-
-
-
 
