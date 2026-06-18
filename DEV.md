@@ -163,6 +163,8 @@ Comptes de demo initialises en base :
 - `test` / `azer`
 - `thomas` / `thomas`
 - `lea` / `lea`
+- `floryan` / `floryan` (coach de demo)
+- `corentin` / `corentin` (sportif suivi par floryan)
 
 ## CI GitLab / Jenkins
 

@@ -49,7 +49,7 @@
 
 TrackrAI est une application de suivi sportif destinée à centraliser des données issues de séances physiques, à les visualiser et à fournir des éléments d'analyse au sportif ainsi qu'à son encadrement. L'application associe un module matériel à base d'ESP32, une interface web/mobile, une API, une base de données, un serveur de centralisation et un serveur d'analyse vidéo.
 
-Le contexte principal d'utilisation est le suivi d'une séance d'entraînement réalisée par un sportif. Une séance peut être démarrée depuis l'interface applicative, puis alimentée par un module connecté qui transmet des mesures GPS, inertielles et cardiaques. Les données sont ensuite agrégées, filtrées et transformées en statistiques de séance. Le sportif consulte son historique, ses scores, compare deux séances et voit son coach référent. Le coach consulte les sportifs qui lui sont affectés, suit une séance active en direct depuis le détail de séance et compare leurs séances avec une lecture orientée progression. L'administrateur gère les utilisateurs, les modules et les affectations coach/sportif.
+Le contexte principal d'utilisation est le suivi d'une séance d'entraînement réalisée par un sportif. Une séance peut être démarrée depuis l'interface applicative, puis alimentée par un module connecté qui transmet des mesures GPS, inertielles, cardiaques et un compteur de pas calculé localement sur l'ESP32 à partir de l'accéléromètre. Les données sont ensuite agrégées, filtrées et transformées en statistiques de séance. Le sportif consulte son historique, ses scores, compare deux séances et voit son coach référent. Le coach consulte les sportifs qui lui sont affectés, suit une séance active en direct depuis le détail de séance et compare leurs séances avec une lecture orientée progression. L'administrateur gère les utilisateurs, les modules et les affectations coach/sportif.
 
 L'application propose également une analyse vidéo de mouvements sportifs. Le flux vidéo est envoyé à un serveur Python par WebSocket, analysé avec MediaPipe/OpenCV, puis stocké dans un historique intégré à la page d'analyse vidéo. Le squat constitue le mode d'analyse principal. Des modes expérimentaux existent pour le développé couché et le soulevé de terre.
 
@@ -96,7 +96,7 @@ API & Node.js, Express, Mongoose & Expose les routes HTTP, applique l'authentifi
 Base de données & MongoDB 6 & Stocke les utilisateurs, modules, chipsets, mesures, séances, statistiques et résultats d'analyse vidéo. \\
 Serveur central & Java, sockets TCP, HttpClient & Reçoit les connexions des modules ESP32, gère l'état des sessions côté module et relaie les mesures vers l'API. \\
 Serveur d'analyse & Python, websockets, OpenCV, MediaPipe & Reçoit les vidéos, extrait les poses, calcule des métriques de mouvement et transmet le résultat au serveur central. \\
-Module matériel & ESP32, GPS, MPU6050, BLE HR & Acquiert les mesures physiques et les transmet au serveur central pendant une séance active. \\
+Module matériel & ESP32, GPS, MPU6050, BLE HR & Acquiert les mesures physiques, calcule un compteur de pas embarqué à partir de l'accéléromètre et transmet les données au serveur central pendant une séance active. \\
 \bottomrule
 \end{longtable}
 
@@ -434,7 +434,7 @@ Le firmware PlatformIO utilise notamment :
 
 Au démarrage, le module charge la configuration stockée. Si aucune configuration WiFi ou serveur n'existe, un point d'accès \texttt{Trackr-ESP32} est ouvert par WiFiManager afin de saisir l'adresse et le port du serveur central. La clé du module est conservée en mémoire flash après auto-enregistrement.
 
-Une fois connecté au serveur central, le module envoie \texttt{AUTOREGISTER} si nécessaire, puis \texttt{HELLO}. Les mesures ne sont envoyées que lorsque le serveur central transmet une commande de démarrage de séance. Les données GPS sont filtrées côté module avec une distance minimale, une vitesse minimale et un intervalle minimal entre deux positions. Les données d'accéléromètre sont envoyées après une phase de stabilisation du MPU6050. La fréquence d'envoi est d'environ une seconde.
+Une fois connecté au serveur central, le module envoie \texttt{AUTOREGISTER} si nécessaire, puis \texttt{HELLO}. Les mesures ne sont envoyées que lorsque le serveur central transmet une commande de démarrage de séance. Les données GPS sont filtrées côté module avec une distance minimale, une vitesse minimale et un intervalle minimal entre deux positions. Le MPU6050 est d'abord stabilisé, puis l'ESP32 échantillonne l'accélération localement afin de détecter les pics de marche/course et maintenir un compteur cumulatif de pas. Ce compteur est transmis comme mesure dédiée \texttt{steps}. Les axes d'accélération et de gyroscope restent envoyés environ une fois par seconde pour le suivi brut et les diagnostics.
 
 \subsection{Calcul des statistiques de séance}
 
@@ -445,13 +445,13 @@ Les statistiques de séance sont calculées à l'arrêt de la séance à partir 
 \textbf{Fichier} & \textbf{Rôle} \\
 \midrule
 \texttt{geo.js} & Calcul de distance par Haversine, filtrage des points GPS aberrants et indicateur de qualité GPS. \\
-\texttt{physio.js} & Estimation des pas à partir de l'accélération, calcul de stress, qualité du comptage de pas. \\
-\texttt{sessionStats.js} & Agrégation globale d'une séance : distance, vitesse, fréquence cardiaque, pas, stress, score et qualité. \\
+\texttt{physio.js} & Calcul de stress et estimation de secours des pas si aucune mesure embarquée \texttt{steps} n'est disponible. \\
+\texttt{sessionStats.js} & Agrégation globale d'une séance : distance, vitesse, fréquence cardiaque, dernière valeur \texttt{steps}, stress, score et qualité GPS. \\
 \texttt{performanceScore.js} & Calcul du score de performance de référence. \\
 \bottomrule
 \end{longtable}
 
-Les mesures GPS et accéléromètre restent dépendantes du matériel et de son placement. Pour cette raison, la séance contient également des indicateurs de qualité qui signalent si la trace GPS ou le comptage de pas sont exploitables, partiellement bruités ou peu fiables.
+La distance et la trace GPS restent dépendantes du matériel, de l'environnement et du placement du module. Le comptage de pas est désormais effectué côté ESP32 comme compteur cumulatif basé sur l'accéléromètre, puis stocké sous forme de mesure \texttt{steps}. Lorsque cette mesure existe, les vues utilisent la dernière valeur transmise par l'ESP32 ; l'estimation logicielle depuis les axes \texttt{acc\_x}, \texttt{acc\_y} et \texttt{acc\_z} n'est conservée qu'en solution de secours.
 
 \subsection{Serveur d'analyse vidéo Python}
 
@@ -592,6 +592,14 @@ La suppression du volume MongoDB, utile pour repartir d'une base vide, se fait a
 docker compose -f docker-compose.dev.yml down -v
 \end{lstlisting}
 
+\subsection{Données de démonstration}
+
+La base initialisée par l'API contient plusieurs comptes de test permettant de présenter les rôles sans manipulation manuelle préalable. Pour la démonstration finale, le compte \texttt{floryan/floryan} est un coach et le compte \texttt{corentin/corentin} est un sportif affecté à ce coach. Des séances historiques sont générées pour Corentin afin de montrer l'historique, le tableau de bord coach et la comparaison entre séances. Les comptes \texttt{admin/admin}, \texttt{coach/coach}, \texttt{test/azer}, \texttt{thomas/thomas} et \texttt{lea/lea} restent également disponibles.
+
+\subsection{Intégration continue GitLab / Jenkins}
+
+Le dépôt contient une configuration d'intégration continue sous deux formes : un fichier \texttt{.gitlab-ci.yml} pour GitLab CI et un \texttt{Jenkinsfile} pour Jenkins. Les deux s'appuient sur \texttt{docker-compose.ci.yml} afin de valider la configuration Docker, construire les images applicatives et lancer les vérifications automatisées dans un environnement reproductible. La documentation complémentaire est conservée dans \texttt{docs/CI\_GITLAB\_JENKINS.md}. Dans un déploiement réel, les secrets utilisés par la CI doivent être déplacés dans les variables protégées GitLab ou Jenkins.
+
 \subsection{Tests}
 
 Les tests manuels prioritaires sont :
@@ -602,7 +610,7 @@ Les tests manuels prioritaires sont :
   \item connexion sportif et vérification du coach référent ;
   \item démarrage et arrêt d'une séance avec un module ESP32 ;
   \item upload d'une vidéo, consultation du résultat et de l'historique intégré sur la même page ;
-  \item vérification des indicateurs de qualité GPS/pas sur une nouvelle séance.
+  \item vérification de la trace GPS et du compteur de pas \texttt{steps} envoyé par l'ESP32 sur une nouvelle séance.
 \end{enumerate}
 
 Les tests d'acceptation peuvent être lancés par :
@@ -616,7 +624,7 @@ mvn test
 
 \subsection{Capteurs}
 
-Le GPS et l'accéléromètre restent sensibles au matériel, à l'environnement et au placement du module. Les filtres appliqués réduisent les points incohérents et fournissent un indicateur de qualité, mais ils ne transforment pas le module en dispositif de mesure scientifique.
+Le GPS reste sensible à l'environnement, en particulier en intérieur ou au démarrage du fix. Le comptage de pas repose uniquement sur l'accéléromètre du MPU6050 et dépend donc du placement du boîtier et du mouvement réalisé. Le compteur embarqué rend la valeur cohérente et cumulative pendant une séance, mais il ne prétend pas atteindre la précision d'un podomètre industriel ou d'une montre sportive calibrée.
 
 \subsection{Analyse vidéo}
 
@@ -672,6 +680,7 @@ Bouton BOOT & GPIO 0 & Réinitialisation longue de la configuration. \\
 \end{itemize}
 
 \end{document}
+
 
 
 

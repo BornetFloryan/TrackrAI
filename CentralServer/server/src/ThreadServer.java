@@ -51,17 +51,25 @@ class ThreadServer extends Thread {
         System.out.println("Thread " + idThread + " cleanup");
 
         if (moduleKey != null) {
-            MainServer.modules.remove(moduleKey);
+            boolean isActiveConnection = MainServer.modules.get(moduleKey) == this;
 
-            try {
-                exchanger.getHttpDriver().moduleConnection(moduleKey, false);
-            } catch (Exception e) {
+            if (isActiveConnection) {
+                MainServer.modules.remove(moduleKey);
+
+                try {
+                    exchanger.getHttpDriver().moduleConnection(moduleKey, false);
+                } catch (Exception e) {
+                    System.out.println(
+                        "moduleConnection(false) ignored (module may not exist yet): " + moduleKey
+                    );
+                }
+
+                System.out.println("Module disconnected: " + moduleKey);
+            } else {
                 System.out.println(
-                    "moduleConnection(false) ignored (module may not exist yet): " + moduleKey
+                    "Thread " + idThread + " cleanup ignored for replaced module connection: " + moduleKey
                 );
-            }            
-
-            System.out.println("Module disconnected: " + moduleKey);
+            }
         }
 
         synchronized (this) {

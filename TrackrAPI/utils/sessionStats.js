@@ -54,8 +54,13 @@ function computeSessionStats(measures) {
   const accX = measuresOf(measures, 'acc_x')
   const accY = measuresOf(measures, 'acc_y')
   const accZ = measuresOf(measures, 'acc_z')
-  const steps = estimateSteps(accX, accY, accZ)
-  const stepsQuality = stepQuality(accX, accY, accZ)
+  const directSteps = lastOf(measures, 'steps')
+  const steps = directSteps != null
+    ? Math.max(0, Math.round(directSteps))
+    : estimateSteps(accX, accY, accZ)
+  const stepsQuality = directSteps != null
+    ? { level: 'high', confidence: 85, message: 'Comptage embarque ESP32' }
+    : stepQuality(accX, accY, accZ)
 
   const rmssdRaw = lastOf(measures, 'rmssd')
   const rmssd = rmssdRaw != null ? Number(rmssdRaw) : null
@@ -80,3 +85,4 @@ function computeSessionStats(measures) {
 }
 
 module.exports = { computeSessionStats }
+

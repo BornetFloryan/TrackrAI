@@ -86,16 +86,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useMeasureStore } from '../store/measure.store'
 import { useSessionStore } from '../store/session.store'
 import { buildGpsTrack, measuresOf } from '../utils/measureAdapters'
 import { estimateStress } from '../utils/physio'
-import { useRouter } from 'vue-router'
+import { getSessionSteps } from '../utils/steps'
 
-import StatCard from '../components/StatCard.vue'
-import MeasureChart from '../components/MeasureChart.vue'
 import GpsMap from '../components/GpsMap.vue'
+import MeasureChart from '../components/MeasureChart.vue'
+import StatCard from '../components/StatCard.vue'
 
 const router = useRouter()
 
@@ -221,12 +222,21 @@ const weightLabel = computed(() => {
   return `${w.wLoad * 100}% / ${w.wIntensity * 100}% / ${w.wRecovery * 100}%`
 })
 
+const displayedSteps = computed(() => {
+  return getSessionSteps(session.value, measures.value)
+})
+
 const stressSub = computed(() => {
-  if (stats.value?.quality?.steps) {
-    return `Pas: ${stats.value.steps ?? 0} - ${stats.value.quality.steps.message} (${stats.value.quality.steps.confidence}% confiance)`
+  const hasRawSteps = measuresOf(measures.value, 'steps').length > 0
+
+  if (hasRawSteps || displayedSteps.value) {
+    return `Pas: ${displayedSteps.value}`
   }
-  if (stats.value?.steps) return `Pas estimés: ${stats.value.steps}`
-  if (isLiveSession.value && stress.value != null) return 'Estimation live basée sur RMSSD / cardio'
+
+  if (isLiveSession.value && stress.value != null) {
+    return 'Estimation live basée sur RMSSD / cardio'
+  }
+
   return ''
 })
 
@@ -254,6 +264,7 @@ function goBack() {
   border-color: rgba(34, 197, 94, .45);
 }
 </style>
+
 
 
 

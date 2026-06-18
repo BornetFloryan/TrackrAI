@@ -127,9 +127,17 @@
                         </div>
 
                         <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
-                            <span class="badge">Score: {{ Math.round(s.score) }}</span>
-                            <span class="badge">HR avg: {{ Math.round(s.hrAvg ?? 0) }}</span>
-                            <span class="badge">Stress: {{ s.stress ?? '—' }}</span>
+<span class="badge">
+  Score: {{ formatRounded(s.score) }}
+</span>
+
+<span class="badge">
+  HR avg: {{ formatRounded(s.hrAvg) }}
+</span>
+
+<span class="badge">
+  Stress: {{ formatRounded(s.stress) }}
+</span>
                         </div>
                     </div>
                 </div>
@@ -139,9 +147,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useMeasureStore } from '../store/measure.store'
 import { useSessionStore } from '../store/session.store'
+import { getSessionSteps } from '../utils/steps'
 
 import MetricLineChart from '../components/MetricLineChart.vue'
 import StatCard from '../components/StatCard.vue'
@@ -149,6 +159,7 @@ import StatCard from '../components/StatCard.vue'
 const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
+const measureStore = useMeasureStore()
 
 const userId = route.params.userId
 
@@ -175,44 +186,74 @@ onMounted(async () => {
 })
 
 async function reload() {
-    loading.value = true
-    try {
-        let list = await sessionStore.fetchHistory()
+  loading.value = true
 
-        const minDate =
-            Date.now() - days.value * 24 * 3600 * 1000
+  try {
+    const minDate =
+      Date.now() - days.value * 24 * 3600 * 1000
 
-        list = list
-            .filter(s => s.user?._id === userId)
-            .filter(s => new Date(s.startDate).getTime() >= minDate)
-            .sort(
-                (a, b) =>
-                    new Date(a.startDate) - new Date(b.startDate)
-            )
+    const after = new Date(minDate).toISOString()
 
-        sessions.value = list.map(s => ({
-            sessionMongoId: s._id,
-            start: s.startDate,
+    const [history, allMeasures] = await Promise.all([
+      sessionStore.fetchHistory(),
+      measureStore.fetch(null, after, null)
+    ])
 
-            stats: s.stats,
+    const list = history
+      .filter(session => {
+        const sessionUserId =
+          typeof session.user === 'object'
+            ? session.user?._id
+            : session.user
 
-            durationMin: Math.round((s.stats?.durationMs ?? 0) / 60000),
-            distanceKm: s.stats?.distanceKm,
-            hrAvg: s.stats?.hrAvg,
-            hrMax: s.stats?.hrMax,
-            steps: s.stats?.steps,
-            stress: s.stats?.stress,
+        return String(sessionUserId) === String(userId)
+      })
+      .filter(session => {
+        return new Date(session.startDate).getTime() >= minDate
+      })
+      .sort((a, b) => {
+        return (
+          new Date(a.startDate).getTime() -
+          new Date(b.startDate).getTime()
+        )
+      })
 
-            score: s.stats?.score?.global ?? null
-        }))
+    sessions.value = list.map(session => ({
+      sessionMongoId: session._id,
+      start: session.startDate,
 
-    } finally {
-        loading.value = false
-    }
+      stats: session.stats,
+
+      durationMin: Math.round(
+        (session.stats?.durationMs ?? 0) / 60000
+      ),
+
+      distanceKm: session.stats?.distanceKm,
+      hrAvg: session.stats?.hrAvg,
+      hrMax: session.stats?.hrMax,
+
+      steps: getSessionSteps(session, allMeasures),
+
+      stress: session.stats?.stress,
+      score: session.stats?.score?.global ?? null
+    }))
+  } finally {
+    loading.value = false
+  }
 }
 
 function goToSession(id) {
     router.push(`/sessions/${id}`)
+}
+
+function formatRounded(value) {
+  const number = Number(value)
+
+  return value !== null &&
+    value !== undefined &&
+    Number.isFinite(number)
+    ? Math.round(number)
+    : '—'
 }
 
 const totalDistanceLabel = computed(() =>

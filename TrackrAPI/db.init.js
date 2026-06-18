@@ -172,9 +172,42 @@ async function initUsers() {
     console.log("cannot add lea");
   }
 
+
+  try {
+    let floryan = await User.findOne({ login: "floryan" }).exec();
+    if (!floryan) {
+      const salt = bcrypt.genSaltSync(SALT_WORK_FACTOR);
+      floryan = await new User({
+        login: "floryan",
+        password: bcrypt.hashSync("floryan", salt),
+        email: "floryan@trackr.ai",
+        rights: ["coach"],
+      }).save();
+      console.log("added floryan");
+    }
+  } catch {
+    console.log("cannot add floryan");
+  }
+
+  try {
+    let corentin = await User.findOne({ login: "corentin" }).exec();
+    if (!corentin) {
+      const salt = bcrypt.genSaltSync(SALT_WORK_FACTOR);
+      corentin = await new User({
+        login: "corentin",
+        password: bcrypt.hashSync("corentin", salt),
+        email: "corentin@trackr.ai",
+        rights: ["basic"],
+      }).save();
+      console.log("added corentin");
+    }
+  } catch {
+    console.log("cannot add corentin");
+  }
   try {
     const coach = await User.findOne({ login: "coach" }).exec();
     const martin = await User.findOne({ login: "martin" }).exec();
+    const floryan = await User.findOne({ login: "floryan" }).exec();
 
     if (coach) {
       await User.updateMany(
@@ -187,6 +220,13 @@ async function initUsers() {
       await User.updateOne(
         { login: "lea" },
         { $set: { coach: martin._id } }
+      ).exec();
+    }
+
+    if (floryan) {
+      await User.updateOne(
+        { login: "corentin" },
+        { $set: { coach: floryan._id } }
       ).exec();
     }
   } catch {
@@ -244,6 +284,7 @@ async function createDemoSessionsForUser(userLogin, profile = {}) {
 
     let baseLat = 47.24 + d * 0.0005;
     let baseLon = 6.02 + d * 0.0005;
+    let demoDistanceKm = 0;
 
     for (let i = 0; i < points; i++) {
       const t = new Date(startDate.getTime() + i * stepMs);
@@ -265,6 +306,7 @@ async function createDemoSessionsForUser(userLogin, profile = {}) {
         2.2,
         (profile.speedBase ?? 2.8) - fatigue * 0.3 + rnd(-0.2, 0.2)
       );
+      demoDistanceKm += (speed * stepMs) / 1000 / 1000;
 
       baseLat += rnd(0.00001, 0.00003);
       baseLon += rnd(0.00001, 0.00003);
@@ -283,6 +325,7 @@ async function createDemoSessionsForUser(userLogin, profile = {}) {
       push("gps_speed", speed.toFixed(2));
       push("gps_lat", baseLat.toFixed(6));
       push("gps_lon", baseLon.toFixed(6));
+      push("steps", Math.round(demoDistanceKm * 1300));
       push("acc_x", Math.round(rnd(-1200, 1200)));
       push("acc_y", Math.round(rnd(-1200, 1200)));
       push("acc_z", Math.round(16384 + rnd(-1000, 1000)));
@@ -368,6 +411,13 @@ async function initDemoData() {
       speedBase: 2.6,
       fatigue: 0.08,
     });
+
+    await createDemoSessionsForUser("corentin", {
+      hrBase: 128,
+      rmssdBase: 36,
+      speedBase: 2.95,
+      fatigue: 0.12,
+    });
   } catch (e) {
     console.log("cannot add demo session data", e);
   }
@@ -381,3 +431,7 @@ async function initBdD() {
 }
 
 module.exports = { initBdD };
+
+
+
+

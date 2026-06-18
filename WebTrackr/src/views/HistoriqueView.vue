@@ -49,7 +49,9 @@
         <div style="display:flex; justify-content:space-between; gap:.75rem; flex-wrap:wrap;">
           <div>
             <div style="font-weight:900; font-size:1.05rem;">
-              {{ formatDate(s.startDate) }} - Score {{ s.stats?.score.global.toFixed(2) }}
+              {{ formatDate(s.startDate) }}
+              -
+              Score {{ formatScore(s.stats?.score?.global) }}
             </div>
             <div class="muted" style="font-size:.9rem;">
               Durée: {{ formatDuration(s.stats?.durationMs) }}
@@ -76,19 +78,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useSessionStore } from '../store/session.store'
+import { onMounted, ref } from 'vue'
+import { useMeasureStore } from '../store/measure.store'
 import { useModuleStore } from '../store/module.store'
+import { useSessionStore } from '../store/session.store'
+import { getSessionSteps } from '../utils/steps'
 
 const sessionStore = useSessionStore()
 const moduleStore = useModuleStore()
+const measureStore = useMeasureStore()
 const { modules } = storeToRefs(moduleStore)
 
 const days = ref(7)
 const moduleKey = ref('')
 const loading = ref(false)
 const sessions = ref([])
+const measures = ref([])
 
 onMounted(async () => {
   await moduleStore.fetch()
@@ -97,28 +103,53 @@ onMounted(async () => {
 
 async function reload() {
   loading.value = true
-  try {
-    let list = await sessionStore.fetchHistory()
 
-    const minDate = Date.now() - days.value * 24 * 3600 * 1000
-    list = list.filter(s => new Date(s.startDate).getTime() >= minDate)
+  try {
+    const minDate =
+      Date.now() - days.value * 24 * 3600 * 1000
+
+    const after = new Date(minDate).toISOString()
+
+    const [history, allMeasures] = await Promise.all([
+      sessionStore.fetchHistory(),
+      measureStore.fetch(null, after, null)
+    ])
+
+    measures.value = allMeasures
+
+    let list = history.filter(session => {
+      return new Date(session.startDate).getTime() >= minDate
+    })
 
     if (moduleKey.value) {
-      list = list.filter(s => s.module?.key === moduleKey.value)
+      list = list.filter(session => {
+        return session.module?.key === moduleKey.value
+      })
     }
 
-    sessions.value = list
+    sessions.value = list.map(session => ({
+      ...session,
+
+      stats: {
+        ...session.stats,
+
+        steps: getSessionSteps(session, measures.value)
+      }
+    }))
   } finally {
     loading.value = false
   }
 }
-
 function formatDate(d) {
   return new Date(d).toLocaleString()
 }
 function formatDuration(ms = 0) {
   const s = Math.floor(ms / 1000)
   return `${Math.floor(s / 60)}m ${s % 60}s`
+}
+function formatScore(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toFixed(2) : '—'
 }
 function fmt(v) {
   return v == null ? '—' : Math.round(v)

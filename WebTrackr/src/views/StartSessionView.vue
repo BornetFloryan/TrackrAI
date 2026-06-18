@@ -35,7 +35,7 @@
     <div class="grid grid-3" style="margin-top:1rem;">
       <Gauge label="BPM (live)" :value="lastHrValue" unit="bpm" :min="40" :max="200" :hint="hrHint" />
       <Gauge label="Stress" :value="stressValue ?? '--'" unit="/100" :min="0" :max="100" :hint="stressHint" />
-      <Gauge label="Pas (estimés)" :value="stepsValue" unit="pas" :min="0" :max="5000" :hint="stepsHint" />
+      <Gauge label="Pas" :value="stepsValue" unit="pas" :min="0" :max="5000" :hint="stepsHint" />
     </div>
 
     <div class="grid grid-3" style="margin-top:1rem;">
@@ -270,10 +270,15 @@ async function fetchMeasures() {
     headingDeg.value = null
   }
 
-  const ax = measuresOf(list, 'acc_x')
-  const ay = measuresOf(list, 'acc_y')
-  const az = measuresOf(list, 'acc_z')
-  stepsValue.value = estimateSteps(ax, ay, az)
+  const directSteps = lastValue(list, 'steps')
+  if (directSteps != null) {
+    stepsValue.value = Math.max(0, Math.round(directSteps))
+  } else {
+    const ax = measuresOf(list, 'acc_x')
+    const ay = measuresOf(list, 'acc_y')
+    const az = measuresOf(list, 'acc_z')
+    stepsValue.value = Math.max(stepsValue.value || 0, estimateSteps(ax, ay, az))
+  }
 
   stressValue.value = estimateStress({ rmssd: lastRmssd.value, hr: lastHr.value })
 
@@ -418,7 +423,10 @@ const speedKmHLabel = computed(() => {
   return `Vitesse: ${kmh.toFixed(1)} km/h`
 })
 
-const stepsHint = computed(() => sessionStore.sessionId ? 'Accéléromètre (pics)' : '—')
+const stepsHint = computed(() => {
+  if (!sessionStore.sessionId) return '—'
+  return measuresOf(measures.value, 'steps').length ? 'Compteur ESP32' : 'Accéléromètre (estimation)'
+})
 const stressHint = computed(() => {
   if (Number.isFinite(lastRmssd.value) && lastRmssd.value > 0) return 'Basé RMSSD'
   if (Number.isFinite(lastHr.value) && lastHr.value > 0) return 'Basé HR'
@@ -444,3 +452,5 @@ watch(
   { deep: true }
 )
 </script>
+
+

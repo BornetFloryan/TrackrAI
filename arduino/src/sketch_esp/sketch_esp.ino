@@ -82,6 +82,19 @@ static bool imuReady = false;
 unsigned long lastSend = 0;
 const unsigned long SEND_INTERVAL = 1000;
 
+/* ================= STEP COUNTER ================= */
+const unsigned long STEP_SAMPLE_INTERVAL = 40;    // 25 Hz, suffisant pour marche/course lente
+const unsigned long STEP_MIN_DELAY_MS = 280;
+const float STEP_PEAK_THRESHOLD = 1800.0f;
+const float STEP_RELEASE_THRESHOLD = 850.0f;
+
+unsigned long lastStepSample = 0;
+unsigned long lastStepAt = 0;
+long stepCount = 0;
+float stepBaseline = 16384.0f;
+float stepMotion = 0.0f;
+bool stepArmed = true;
+
 /* ================= HRV ================= */
 static const int RR_BUF_SIZE = 64;
 
@@ -242,6 +255,47 @@ void sendMeasure(const char* type, float value) {
   tcp.println(moduleKey);
 }
 
+
+void resetStepCounter() {
+  stepCount = 0;
+  lastStepAt = 0;
+  lastStepSample = 0;
+  stepBaseline = 16384.0f;
+  stepMotion = 0.0f;
+  stepArmed = true;
+}
+
+void updateStepCounter() {
+  if (!recording) return;
+  if (!imuReady && millis() - imuStartMs < IMU_WARMUP_MS) return;
+
+  unsigned long now = millis();
+  if (now - lastStepSample < STEP_SAMPLE_INTERVAL) return;
+  lastStepSample = now;
+  imuReady = true;
+
+  int16_t ax, ay, az, gx, gy, gz;
+  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+
+  const float mag = sqrt((float)ax * ax + (float)ay * ay + (float)az * az);
+  stepBaseline = stepBaseline * 0.985f + mag * 0.015f;
+
+  const float delta = fabs(mag - stepBaseline);
+  stepMotion = stepMotion * 0.65f + delta * 0.35f;
+
+  const bool enoughDelay = (lastStepAt == 0) || (now - lastStepAt >= STEP_MIN_DELAY_MS);
+
+  if (stepArmed && enoughDelay && stepMotion >= STEP_PEAK_THRESHOLD) {
+    stepCount++;
+    lastStepAt = now;
+    stepArmed = false;
+    Serial.printf("STEP %ld motion=%.0f\n", stepCount, stepMotion);
+  }
+
+  if (!stepArmed && stepMotion <= STEP_RELEASE_THRESHOLD) {
+    stepArmed = true;
+  }
+}
 void handleServerCommands() {
   while (tcp.available()) {
     String cmd = tcp.readStringUntil('\n');
@@ -251,6 +305,7 @@ void handleServerCommands() {
       recording = true;
       imuStartMs = millis();
       imuReady = false;
+      resetStepCounter();
       Serial.println("Enregistrement démarré (session)");
     } else if (cmd == "STOP_SESSION") {
       recording = false;
@@ -438,14 +493,17 @@ void loop() {
     return;                 // on laisse le serveur traiter + éventuellement envoyer START_SESSION
   }
 
-  // 3) Timing
+  // 3) Echantillonnage rapide IMU pour le comptage des pas
+  updateStepCounter();
+
+  // 4) Timing d'envoi réseau
   if (millis() - lastSend < SEND_INTERVAL) return;
   lastSend = millis();
 
-  // 4) On n'envoie des mesures que si session active
+  // 5) On n'envoie des mesures que si session active
   if (!recording) return;
 
-  // 5) GPS (filtré)
+  // 6) GPS (filtré)
   // On envoie la position dès qu'elle est valide. La vitesse GPS peut rester invalide
   // en intérieur ou au début du fix, donc elle ne doit pas bloquer la trace.
   if (fix.valid.location) {
@@ -476,7 +534,7 @@ void loop() {
     hasLastFix = true;
   }
 
-  // 6) HEART
+  // 7) HEART
   sendMeasure("heart_rate", heartRate);
 
   if (rmssdDirty) {
@@ -488,7 +546,7 @@ void loop() {
     }
   }
 
-  // 7) IMU (avec warmup)
+  // 8) IMU (avec warmup)
   if (imuReady || millis() - imuStartMs >= IMU_WARMUP_MS) {
 
     imuReady = true;
@@ -499,11 +557,13 @@ void loop() {
     sendMeasure("acc_x", ax);
     sendMeasure("acc_y", ay);
     sendMeasure("acc_z", az);
+    sendMeasure("steps", (float)stepCount);
     sendMeasure("gyro_x", gx);
     sendMeasure("gyro_y", gy);
     sendMeasure("gyro_z", gz);
   }
 }
+
 
 
 
