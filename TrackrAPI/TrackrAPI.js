@@ -5,6 +5,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require("cors");
 const trackrapiRouter = require('./routes/trackrapi.route'); // Imports routes
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocs = require('./config/swaggerConfig');
 const Config = require("./commons/config");
 const { initAI } = require("./ai/initAI");
 const { answerContext } = require("./controllers/ControllerAnswer");
@@ -37,7 +39,7 @@ const app = express();
 const corsOptions = {
     methods: 'GET,POST,PUT,PATCH,DELETE',
     origin: [ /.*$/ ],
-    allowedHeaders: "x-session-id, Origin, Content-Type, Accept",
+    allowedHeaders: "Authorization, x-session-id, Origin, Content-Type, Accept",
     credentials: true,
 };
 
@@ -72,7 +74,7 @@ app.use(answerContext);
 app.use(function(req, res, next) {
   res.header(
     "Access-Control-Allow-Headers",
-    "x-session-id, Origin, Content-Type, Accept"
+    "Authorization, x-session-id, Origin, Content-Type, Accept"
   );
   next();
 });
@@ -80,6 +82,21 @@ app.use(function(req, res, next) {
 /* serve production version of gnose app. */
 //app.use(express.static(path.join(__dirname, '../../vuejs/gnose/dist')));
 
+app.use('/trackrapi/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, {
+  explorer: true,
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+  },
+}));
+
+app.get('/trackrapi/swagger.json', (req, res) => {
+  res.status(200).json(swaggerDocs);
+});
+
+app.get('/trackrapi/docs', (req, res) => {
+  res.redirect('/trackrapi/api-docs');
+});
 
 app.use('/trackrapi', trackrapiRouter);
 
@@ -114,4 +131,5 @@ const port = Number(process.env.PORT || 4567);
 httpServer.listen(port, () =>
   console.log(`trackrapi started on port ${port}!`)
 );
+
 

@@ -26,6 +26,10 @@
             <router-link class="link" to="/sessions">
               Historique
             </router-link>
+
+            <router-link class="link" to="/sessions/compare">
+              Comparer
+            </router-link>
           </template>
 
           <!-- COACH -->
@@ -37,15 +41,16 @@
             <router-link class="link" to="/coach/athletes">
               Sportifs
             </router-link>
+
+            <router-link class="link" to="/sessions/compare">
+              Comparer
+            </router-link>
           </template>
 
           <!-- SPORTIF ET COACH -->
           <template v-if="isSportif || isCoach">
             <router-link class="link" to="/mobile/video">
               Analyse vidéo
-            </router-link>
-            <router-link class="link" to="/analyses">
-              Analyses vidéo
             </router-link>
           </template>
 
@@ -213,3 +218,6 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
   }
 }
 </style>
+
+
+

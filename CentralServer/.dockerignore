@@ -1,6 +1,7 @@
+.git
+.gitignore
 .idea
 out
 build
 target
 *.class
-*.iml

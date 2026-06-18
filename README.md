@@ -89,57 +89,38 @@ Le projet est conçu pour fonctionner de manière identique sur :
 
 Le mode développement repose exclusivement sur Docker Compose v2.
 
-### Prérequis
+### 📡 Module ESP32 : reset et connexion
 
-- Docker ≥ 24
-- Docker Compose v2 (`docker compose`)
-- Git
+L'ESP32 utilise WiFiManager pour configurer le WiFi et l'adresse du serveur TrackrAI.
 
-Sous Windows, Docker Desktop doit être utilisé avec l’intégration WSL activée.
+Pour refaire une configuration propre de l'ESP32 :
 
-### Lancement du projet
+1. Allumer l'ESP32.
+2. Maintenir le bouton **BOOT** environ 5 secondes au démarrage.
+3. Attendre le message de reset dans le moniteur série.
+4. Se connecter depuis un téléphone ou un PC au WiFi créé par l'ESP32 :
 
-Depuis la racine du dépôt :
-
-```bash
-docker compose -f docker-compose.dev.yml up --build
+```text
+Trackr-ESP32
 ```
 
-Les services exposés en développement sont :
+5. Dans le portail WiFiManager, choisir le WiFi de la salle/du PC et renseigner le serveur :
 
-- Frontend (Vite) : [http://localhost:5173](http://localhost:5173)
-- API Trackr (Node.js) : [http://localhost:4567](http://localhost:4567)
-- Central Server (TCP) : port 29000
-- MongoDB : port 27017
-
-### Arrêt des services
-
-```bash
-docker compose down
+```text
+Server host : adresse IP de la machine qui lance Docker
+Server port : 29000
 ```
 
-### Réinitialisation complète (optionnel)
+Exemple :
 
-```bash
-docker compose down -v
+```text
+Server host : 192.168.31.100
+Server port : 29000
 ```
 
-⚠️ Cette commande supprime également les données MongoDB.
+6. Valider. L'ESP32 sauvegarde le WiFi, l'adresse du serveur et sa clé module en mémoire flash.
 
----
-
-### 📡 Modules externes (ESP, capteurs)
-
-Les modules externes (ex. ESP32) communiquent directement avec le Central Server
-via une connexion TCP persistante.
-
-Configuration typique côté module :
-
-- **Server host** : adresse IP de la machine exécutant Docker
-- **Server port** : `29000`
-
-Aucune configuration spécifique à Docker ou à l’OS n’est nécessaire côté module.
-
+En développement comme en production locale, l'ESP32 communique avec le serveur central Java exposé sur le port `29000`.
 ---
 
 ## 👥 Équipe

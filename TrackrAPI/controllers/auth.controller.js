@@ -1,11 +1,11 @@
 /**
- * defines methods to manage jwt and authentication processes
+ * Defines methods to manage JWT sessions and authentication processes.
  * @module AuthController
  */
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 
-const Config = require("../commons/config");
 const validator = require('validator');
 
 const User = require('../models/user.model');
@@ -13,7 +13,6 @@ const User = require('../models/user.model');
 const UserErrors = require('../commons/user.errors');
 const AuthErrors = require('../commons/auth.errors');
 
-const Helpers = require('./helpers.controller');
 const {answer} = require('./ControllerAnswer')
 
 const ACCESS_TOKEN_TTL_MINUTES = Number(
@@ -28,6 +27,21 @@ function buildAccessExpiry() {
 
 function buildRefreshExpiry() {
   return new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000)
+}
+
+function jwtSecret() {
+  return process.env.JWT_SECRET || process.env.SERVICE_SECRET || 'trackrai-dev-jwt-secret'
+}
+
+function createAccessToken(user) {
+  const expiresAt = user.sessionExpiresAt || buildAccessExpiry()
+  return jwt.sign({
+    sub: String(user._id),
+    login: user.login,
+    rights: user.rights || [],
+    jti: user.sessionId,
+    exp: Math.floor(expiresAt.getTime() / 1000),
+  }, jwtSecret())
 }
 
 function issueTokens(user) {
@@ -49,11 +63,19 @@ function toAuthPayload(user) {
     login: user.login,
     coach: coachInfo,
     rights: user.rights,
-    token: user.sessionId,
+    token: createAccessToken(user),
     expiresAt: user.sessionExpiresAt,
     refreshToken: user.refreshToken,
     refreshExpiresAt: user.refreshExpiresAt,
   }
+}
+
+function extractAccessToken(req) {
+  const authorization = req.headers.authorization || ''
+  if (authorization.toLowerCase().startsWith('bearer ')) {
+    return authorization.slice(7).trim()
+  }
+  return req.headers['x-session-id']
 }
 
 /**
@@ -141,16 +163,22 @@ const verifyToken = async function (req, res, next) {
 
   answer.reset()
 
-  // suppose that the session id is in the request headers
-  let id = req.headers["x-session-id"];
-  // first check if xsrf token exists, and if not it is assumed that no login was sucessful
-  if (!id) {
+  const token = extractAccessToken(req)
+  if (!token) {
     answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_NO_TOKEN));
     return next(answer);
   }
-  // now find if user in in DB and bind it the req
+
+  let decoded
   try {
-    let user = await User.findOne({sessionId: id})
+    decoded = jwt.verify(token, jwtSecret())
+  } catch(err) {
+    answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_NOT_AUTHORIZED))
+    return next(answer)
+  }
+
+  try {
+    let user = await User.findOne({_id: decoded.sub, sessionId: decoded.jti})
       .populate('coach', '_id login email')
       .exec()
     if (user === null) {
@@ -165,6 +193,7 @@ const verifyToken = async function (req, res, next) {
       return next(answer)
     }
     req.user = user;
+    req.jwt = decoded;
   }
   catch(err) {
     answer.set (AuthErrors.getError(AuthErrors.ERR_AUTH_NOT_AUTHORIZED));
@@ -196,7 +225,7 @@ const me = async function (req, res) {
 const refresh = async function (req, res, next) {
   answer.reset()
 
-  const token = req.body?.refreshToken || req.headers["x-refresh-token"]
+  const token = req.body?.refreshToken || req.headers['x-refresh-token']
   if (!token) {
     answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_NO_TOKEN))
     return next(answer)
@@ -239,7 +268,7 @@ const verifyServiceSecret = async function (req, res, next) {
     return next()
   }
 
-  const provided = req.headers["x-service-secret"]
+  const provided = req.headers['x-service-secret']
   if (provided && provided === expected) {
     return next()
   }
@@ -258,11 +287,11 @@ const verifyServiceSecret = async function (req, res, next) {
 const onlyAdmin = async function(req, res, next) {
   answer.reset()
   if (!req.user) {
-    console.log("onlyAdmin(): no user found in req");
+    console.log('onlyAdmin(): no user found in req');
     answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_NOT_AUTHORIZED))
     return next(answer);
   }
-  if (req.user.rights.includes("admin")) {
+  if (req.user.rights.includes('admin')) {
     return next();
   }
   answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_INVALID_RIGHT))
@@ -271,7 +300,7 @@ const onlyAdmin = async function(req, res, next) {
 
 const onlyAdminOrCoach = async function(req, res, next) {
   answer.reset()
-  if (req.user?.rights?.some((right) => right === "admin" || right === "coach")) {
+  if (req.user?.rights?.some((right) => right === 'admin' || right === 'coach')) {
     return next();
   }
   answer.set(AuthErrors.getError(AuthErrors.ERR_AUTH_INVALID_RIGHT))

@@ -9,9 +9,9 @@ import SessionDetailView from '../views/SessionDetailView.vue'
 import AdminView from '../views/AdminView.vue'
 import CoachView from '../views/CoachView.vue'
 import MobileVideoView from '../views/MobileVideoView.vue'
-import AnalysisHistoryView from '../views/AnalysisHistoryView.vue'
 import CoachAthletesView from '../views/CoachAthletesView.vue'
 import CoachAthleteDashboardView from '../views/CoachAthleteDashboardView.vue'
+import CompareSessionsView from '../views/CompareSessionsView.vue'
 
 const routes = [
   { path: '/', redirect: '/login' },
@@ -32,6 +32,11 @@ const routes = [
     path: '/sessions',
     component: HistoriqueView,
     meta: { requiresAuth: true, requiresBasic: true }
+  },
+  {
+    path: '/sessions/compare',
+    component: CompareSessionsView,
+    meta: { requiresAuth: true }
   },
 
   {
@@ -75,8 +80,7 @@ const routes = [
   },
   {
     path: '/analyses',
-    component: AnalysisHistoryView,
-    meta: { requiresAuth: true }
+    redirect: '/mobile/video'
   },
 ]
 
@@ -129,3 +133,6 @@ router.beforeEach((to, from, next) => {
 })
 
 export default router
+
+
+

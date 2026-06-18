@@ -57,7 +57,7 @@ const theme = computed(() => COLORS[props.type] ?? COLORS.default)
 
 const chartData = computed(() => ({
   labels: props.series.map(p =>
-    new Date(p.date).toLocaleTimeString()
+    new Date(p.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   ),
   datasets: [{
     label: props.title,
@@ -68,7 +68,7 @@ const chartData = computed(() => ({
     borderWidth: 2,
     fill: true,
 
-    pointRadius: 4,
+    pointRadius: props.series.length > 25 ? 2 : 4,
     pointHoverRadius: 10,
     pointHitRadius: 20,
     hoverBorderWidth: 2,

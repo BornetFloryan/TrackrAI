@@ -5,7 +5,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/data/db
+      - mongo-data-dev:/data/db
 
   central:
     build: ./CentralServer
@@ -33,6 +33,7 @@ services:
       - CENTRAL_HOST=central
       - CENTRAL_PORT=9000
       - SERVICE_SECRET=trackrai-service-dev
+      - JWT_SECRET=trackrai-jwt-dev-demo
       - USER_ACCESS_TOKEN_TTL_MINUTES=15
       - USER_REFRESH_TOKEN_TTL_DAYS=7
     ports:
@@ -60,8 +61,8 @@ services:
     working_dir: /app
     volumes:
       - ./WebTrackr:/app
-      - /app/node_modules
-    command: sh -c "npm install && npm run dev -- --host"
+      - frontend-node-modules-dev:/app/node_modules
+    command: sh -c "npm ci --include=optional --ignore-scripts --no-audit --no-fund --cache /tmp/npm-cache && npm install @esbuild/linux-x64 @rollup/rollup-linux-x64-gnu --no-save --ignore-scripts --no-audit --no-fund --cache /tmp/npm-cache && npm run dev -- --host 0.0.0.0"
     environment:
       - VITE_API_BASE_URL=/trackrapi
       - VITE_ANALYZE_WS_URL=ws://localhost:6000
@@ -72,4 +73,13 @@ services:
       - analyze
 
 volumes:
-  mongo-data:
+  mongo-data-dev:
+  frontend-node-modules-dev:
+
+
+
+
+
+
+
+

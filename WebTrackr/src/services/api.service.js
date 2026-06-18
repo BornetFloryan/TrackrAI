@@ -55,6 +55,7 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('trackr_token')
 
   if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`
     config.headers['x-session-id'] = token
   }
 
@@ -79,6 +80,7 @@ api.interceptors.response.use(
       try {
         const token = await refreshAccessToken()
         original.headers = original.headers || {}
+        original.headers['Authorization'] = `Bearer ${token}`
         original.headers['x-session-id'] = token
         return api(original)
       } catch (_) {

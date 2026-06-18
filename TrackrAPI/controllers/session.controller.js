@@ -43,6 +43,19 @@ const start = async (req, res, next) => {
   }).exec();
 
   if (existing) {
+    if (String(existing.user) === String(user._id)) {
+      answer.setPayload({
+        alreadyActive: true,
+        sessionId: existing.sessionId,
+        sessionMongoId: existing._id,
+        moduleKey,
+        startDate: existing.startDate,
+        lastMeasureAt: existing.lastMeasureAt,
+        lastHeartRateAt: existing.lastHeartRateAt,
+      });
+      return res.status(200).send(answer);
+    }
+
     answer.set(
       SessionErrors.getError(SessionErrors.ERR_SESSION_ALREADY_ACTIVE)
     );
@@ -57,6 +70,7 @@ const start = async (req, res, next) => {
     module: module._id,
     startDate: new Date(),
     lastMeasureAt: new Date(),
+    lastHeartRateAt: null,
   });
 
   await session.save();
@@ -169,7 +183,7 @@ const stop = async (req, res, next) => {
     console.error(`[AI] Prediction failed for session ${session.sessionId}:`, e.message)
   }
 
-  answer.setPayload({ stopped: true })
+  answer.setPayload({ stopped: true, sessionMongoId: session._id, sessionId: session.sessionId })
   return res.status(200).send(answer)
 }
 
@@ -216,7 +230,15 @@ const activeForModule = async (req, res) => {
     return res.status(200).send(answer);
   }
 
-  answer.setPayload({ active: true, sessionId: session.sessionId });
+  answer.setPayload({
+    active: true,
+    sessionId: session.sessionId,
+    sessionMongoId: session._id,
+    moduleKey,
+    startDate: session.startDate,
+    lastMeasureAt: session.lastMeasureAt,
+    lastHeartRateAt: session.lastHeartRateAt,
+  });
   return res.status(200).send(answer);
 };
 
@@ -251,3 +273,4 @@ const history = async (req, res, next) => {
 }
 
 module.exports = { start, stop, active, activeForModule, history };
+

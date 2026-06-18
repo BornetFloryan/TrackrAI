@@ -20,5 +20,10 @@ export default {
     const res = await api.get('/analysis', { params: { limit } })
     if (res.data.error !== 0) throw new Error(res.data.data)
     return res.data.data
+  },
+  async saveAnalysis(payload) {
+    const res = await api.post('/analysis', payload)
+    if (res.data.error !== 0) throw new Error(res.data.data)
+    return res.data.data
   }
 }

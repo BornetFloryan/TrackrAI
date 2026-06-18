@@ -42,6 +42,7 @@ router.post('/session/active', asyncRoute(authController.verifyServiceSecret), a
 router.post('/session/active-for-module', asyncRoute(authController.verifyToken), asyncRoute(sessionController.activeForModule));
 router.get('/session/history', asyncRoute(authController.verifyToken), asyncRoute(sessionController.history));
 
+router.post('/analysis', asyncRoute(authController.verifyToken), asyncRoute(measureController.createAnalysis));
 router.get('/analysis', asyncRoute(authController.verifyToken), asyncRoute(measureController.getAnalyses));
 router.get('/analysis/:analysisId', asyncRoute(authController.verifyToken), asyncRoute(measureController.getAnalysisById));
 

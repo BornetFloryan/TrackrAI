@@ -10,7 +10,7 @@ export default {
   async stop(moduleKey) {
     const res = await api.post('/session/stop', { moduleKey })
     if (res.data.error !== 0) throw new Error(res.data.data)
-    return true
+    return res.data.data
   },
 
   async activeForModule(moduleKey) {
@@ -25,3 +25,4 @@ export default {
     return res.data.data
   },
 }
+

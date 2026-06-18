@@ -132,9 +132,15 @@ const create = async function (req, res, next) {
       return next(answer);
     }
 
+    const now = new Date();
+    const sessionUpdate = { lastMeasureAt: now };
+    if (req.body.type === "heart_rate" && Number(req.body.value) > 0) {
+      sessionUpdate.lastHeartRateAt = now;
+    }
+
     await Session.updateOne(
       { _id: session._id },
-      { $set: { lastMeasureAt: new Date() } }
+      { $set: sessionUpdate }
     ).exec();
 
     answer.data = measure;
@@ -294,6 +300,53 @@ const getMeasures = async function (req, res, next) {
   res.status(200).send(answer);
 };
 
+const createAnalysis = async function (req, res, next) {
+  answer.reset();
+
+  const analysisId = req.body?.analysisId;
+  const result = req.body?.result;
+  const exercise = req.body?.exercise || result?.exercise || "squat";
+  const type = req.body?.type || "SPORT";
+  const date = req.body?.date ? new Date(req.body.date) : new Date();
+
+  if (!analysisId || !result || typeof result !== "object" || Array.isArray(result)) {
+    answer.set(MeasureErrors.getError(MeasureErrors.ERR_MEASURE_DATA_NOT_DEFINED));
+    return next(answer);
+  }
+
+  const payload = {
+    ...result,
+    analysisId,
+    exercise,
+    userId: String(req.user._id),
+    userLogin: req.user.login,
+    storedByApi: true,
+  };
+
+  const value = Buffer.from(JSON.stringify(payload), "utf-8").toString("base64");
+
+  let measure;
+  try {
+    measure = await Measure.findOneAndUpdate(
+      { analysisId },
+      {
+        $set: {
+          type,
+          date,
+          value,
+          analysisId,
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    ).exec();
+  } catch (err) {
+    answer.set(MeasureErrors.getError(MeasureErrors.ERR_MEASURE_INVALID_CREATE_REQUEST));
+    return next(answer);
+  }
+
+  answer.setPayload(parseStoredAnalysis(measure));
+  return res.status(201).send(answer);
+};
 const getAnalysisById = async function (req, res, next) {
   answer.reset();
 
@@ -334,7 +387,11 @@ const getAnalysisById = async function (req, res, next) {
   } else if (req.user.rights.includes("coach") && !req.user.rights.includes("admin")) {
     const athletes = await User.find({ coach: req.user._id }, "_id login").lean().exec();
     const allowedOwners = new Set(
-      athletes.flatMap((athlete) => [String(athlete._id), String(athlete.login)])
+      [
+        String(req.user._id),
+        String(req.user.login),
+        ...athletes.flatMap((athlete) => [String(athlete._id), String(athlete.login)]),
+      ]
     );
 
     const owner = parsed?.userId;
@@ -403,7 +460,11 @@ const getAnalyses = async function (req, res, next) {
   } else if (req.user.rights.includes("coach") && !req.user.rights.includes("admin")) {
     const athletes = await User.find({ coach: req.user._id }, "_id login").lean().exec();
     const allowedOwners = new Set(
-      athletes.flatMap((athlete) => [String(athlete._id), String(athlete.login)])
+      [
+        String(req.user._id),
+        String(req.user.login),
+        ...athletes.flatMap((athlete) => [String(athlete._id), String(athlete.login)]),
+      ]
     );
 
     analyses = analyses.filter((analysis) => {
@@ -420,6 +481,7 @@ module.exports = {
   create,
   update,
   getMeasures,
+  createAnalysis,
   getAnalyses,
   getAnalysisById,
 };

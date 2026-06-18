@@ -54,6 +54,7 @@ venv/
 # --------------------------------------------------
 *.zip
 *.tar.gz
+*.tgz
 *.rar
 *.7z
 artifacts/
@@ -89,6 +90,7 @@ docker/volumes/
 .env
 .env.*
 !.env.example
+!**/.env.example
 
 # --------------------------------------------------
 # Jenkins local / CI artifacts
@@ -155,6 +157,7 @@ pip-delete-this-directory.txt
 .env
 .env.*
 !.env.example
+!**/.env.example
 
 # Windows junk
 *:Zone.Identifier

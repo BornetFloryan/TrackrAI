@@ -365,12 +365,37 @@ void setup() {
   initBLE();
 }
 
-void sendHello() {
-  if (!tcp.connected()) return;
+void clearModuleRegistration() {
+  Serial.println("Module key invalide, ré-enregistrement nécessaire");
+  prefs.remove("moduleKey");
+  moduleKey = "";
+  registered = false;
+  recording = false;
+}
+
+bool sendHello() {
+  if (!tcp.connected()) return false;
+
   tcp.print("HELLO ");
   tcp.println(moduleKey);
   tcp.flush();
   Serial.println("HELLO envoyé : " + moduleKey);
+
+  String resp;
+  if (!readLine(resp)) {
+    Serial.println("HELLO -> pas de réponse serveur");
+    return false;
+  }
+
+  Serial.println("HELLO -> " + resp);
+
+  if (resp.startsWith("OK")) {
+    return true;
+  }
+
+  clearModuleRegistration();
+  tcp.stop();
+  return false;
 }
 
 /* ================= LOOP ================= */
@@ -390,9 +415,13 @@ void loop() {
     }
     Serial.println("TCP connecté");
 
-    // Si déjà enregistré, on s'identifie tout de suite
+    // Si déjà enregistré, on s'identifie tout de suite.
+    // Si Mongo a été réinitialisée, le serveur répond ERR et on repasse en AUTOREGISTER.
     if (registered && moduleKey.length() > 0) {
-      sendHello();
+      if (!sendHello()) {
+        delay(500);
+        return;
+      }
     }
   }
 
@@ -417,13 +446,11 @@ void loop() {
   if (!recording) return;
 
   // 5) GPS (filtré)
-  if (fix.valid.location && fix.valid.speed) {
-    if (!hasLastFix) {
-      sendMeasure("gps_lat", fix.latitude());
-      sendMeasure("gps_lon", fix.longitude());
-    }
-
+  // On envoie la position dès qu'elle est valide. La vitesse GPS peut rester invalide
+  // en intérieur ou au début du fix, donc elle ne doit pas bloquer la trace.
+  if (fix.valid.location) {
     unsigned long nowMs = millis();
+    bool shouldSendPosition = !hasLastFix;
 
     if (hasLastFix && (nowMs - lastFixMs) > GPS_MIN_DT_MS) {
       double dM = haversineMeters(
@@ -431,10 +458,14 @@ void loop() {
         lastLat, lastLon
       );
 
-      if (dM >= GPS_MIN_DIST_M && fix.speed_kph() >= GPS_MIN_SPEED_KPH) {
+      shouldSendPosition = dM >= GPS_MIN_DIST_M;
+    }
 
-        sendMeasure("gps_lat", fix.latitude());
-        sendMeasure("gps_lon", fix.longitude());
+    if (shouldSendPosition) {
+      sendMeasure("gps_lat", fix.latitude());
+      sendMeasure("gps_lon", fix.longitude());
+
+      if (fix.valid.speed && fix.speed_kph() >= GPS_MIN_SPEED_KPH) {
         sendMeasure("gps_speed", fix.speed_kph());
       }
     }
@@ -473,4 +504,6 @@ void loop() {
     sendMeasure("gyro_z", gz);
   }
 }
+
+
 

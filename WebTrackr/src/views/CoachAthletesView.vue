@@ -47,6 +47,15 @@
           </ul>
         </div>
 
+        <button
+          v-if="activeSessionFor(u)"
+          class="live-button"
+          type="button"
+          @click.stop="goLive(u)"
+        >
+          Voir la séance en direct
+        </button>
+
         <div class="hint">
           {{ isMine(u) ? 'Voir le profil →' : 'Non accessible sans affectation' }}
         </div>
@@ -61,7 +70,7 @@
 
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../store/user.store'
 import { useSessionStore } from '../store/session.store'
@@ -75,12 +84,21 @@ const auth = useAuthStore()
 const query = ref('')
 const scope = ref('mine')
 const sessions = ref([])
+let refreshPoller = null
+
+async function refreshSessions() {
+  sessions.value = await sessionStore.fetchHistory()
+}
 
 onMounted(async () => {
   await userStore.fetch()
-  sessions.value = await sessionStore.fetchHistory()
+  await refreshSessions()
+  refreshPoller = setInterval(refreshSessions, 5000)
 })
 
+onUnmounted(() => {
+  if (refreshPoller) clearInterval(refreshPoller)
+})
 const athletes = computed(() =>
   userStore.users.filter(u => u.rights.includes('basic'))
 )
@@ -113,6 +131,23 @@ function coachLabel(user) {
   if (!user?.coach) return 'Aucun coach'
   if (typeof user.coach === 'object') return `Coach : ${user.coach.login || '—'}`
   return 'Autre coach'
+}
+
+function sessionUserId(session) {
+  return typeof session.user === 'object' ? session.user?._id : session.user
+}
+
+function activeSessionFor(user) {
+  if (!isMine(user)) return null
+  return sessions.value.find(s =>
+    String(sessionUserId(s)) === String(user._id) && !s.endDate
+  ) || null
+}
+
+function goLive(user) {
+  const session = activeSessionFor(user)
+  if (!session?._id) return
+  router.push(`/sessions/${session._id}`)
 }
 
 const athleteInsights = computed(() => {
@@ -192,8 +227,12 @@ function go(user) {
   font-size: .9rem;
 }
 
-.hint {
-  margin-top: .4rem;
+.live-button {
+  width: 100%;
+  margin-top: .75rem;
+}
+
+.hint {  margin-top: .4rem;
   font-size: .8rem;
   color: rgba(110, 231, 255, .85);
 }
@@ -210,3 +249,6 @@ function go(user) {
   min-width: 220px;
 }
 </style>
+
+
+

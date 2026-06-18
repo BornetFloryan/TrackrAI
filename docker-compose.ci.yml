@@ -15,6 +15,7 @@ services:
       CENTRAL_HOST: central
       CENTRAL_PORT: 9000
       SERVICE_SECRET: trackrai-service-ci
+      JWT_SECRET: trackrai-jwt-ci-demo
       USER_ACCESS_TOKEN_TTL_MINUTES: 15
       USER_REFRESH_TOKEN_TTL_DAYS: 7
     ports:
@@ -63,3 +64,4 @@ services:
     depends_on:
       - api
       - analyze
+

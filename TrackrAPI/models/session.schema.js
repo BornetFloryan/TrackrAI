@@ -13,6 +13,8 @@ let SessionSchema = new Schema({
 
     lastMeasureAt: { type: Date },
 
+    lastHeartRateAt: { type: Date },
+
     endDate: { type: Date },
 
     stats: { type: mongoose.Schema.Types.Mixed },

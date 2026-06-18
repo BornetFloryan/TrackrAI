@@ -49,9 +49,9 @@
 
 TrackrAI est une application de suivi sportif destinée à centraliser des données issues de séances physiques, à les visualiser et à fournir des éléments d'analyse au sportif ainsi qu'à son encadrement. L'application associe un module matériel à base d'ESP32, une interface web/mobile, une API, une base de données, un serveur de centralisation et un serveur d'analyse vidéo.
 
-Le contexte principal d'utilisation est le suivi d'une séance d'entraînement réalisée par un sportif. Une séance peut être démarrée depuis l'interface applicative, puis alimentée par un module connecté qui transmet des mesures GPS, inertielles et cardiaques. Les données sont ensuite agrégées, filtrées et transformées en statistiques de séance. Le sportif consulte son historique, ses scores et son coach référent. Le coach consulte les sportifs qui lui sont affectés et peut comparer leurs séances. L'administrateur gère les utilisateurs, les modules et les affectations coach/sportif.
+Le contexte principal d'utilisation est le suivi d'une séance d'entraînement réalisée par un sportif. Une séance peut être démarrée depuis l'interface applicative, puis alimentée par un module connecté qui transmet des mesures GPS, inertielles et cardiaques. Les données sont ensuite agrégées, filtrées et transformées en statistiques de séance. Le sportif consulte son historique, ses scores, compare deux séances et voit son coach référent. Le coach consulte les sportifs qui lui sont affectés, suit une séance active en direct depuis le détail de séance et compare leurs séances avec une lecture orientée progression. L'administrateur gère les utilisateurs, les modules et les affectations coach/sportif.
 
-L'application propose également une analyse vidéo de mouvements sportifs. Le flux vidéo est envoyé à un serveur Python par WebSocket, analysé avec MediaPipe/OpenCV, puis stocké dans l'historique. Le squat constitue le mode d'analyse principal. Des modes expérimentaux existent pour le développé couché et le soulevé de terre.
+L'application propose également une analyse vidéo de mouvements sportifs. Le flux vidéo est envoyé à un serveur Python par WebSocket, analysé avec MediaPipe/OpenCV, puis stocké dans un historique intégré à la page d'analyse vidéo. Le squat constitue le mode d'analyse principal. Des modes expérimentaux existent pour le développé couché et le soulevé de terre.
 
 Enfin, un module d'intelligence artificielle produit un score prédictif de séance à partir de statistiques calculées sur l'historique. Le modèle utilisé est un modèle XGBoost entraîné sur les séances disponibles, avec une augmentation synthétique contrôlée afin de stabiliser la démonstration lorsque le volume de données réel reste limité.
 
@@ -114,8 +114,8 @@ Module matériel & ESP32, GPS, MPU6050, BLE HR & Acquiert les mesures physiques 
 \texttt{AnalyzeServer/} & Serveur Python WebSocket d'analyse vidéo. Contient les analyseurs, le stockage temporaire des vidéos et le client TCP vers le serveur central. \\
 \texttt{arduino/} & Firmware ESP32 PlatformIO. Contient le sketch de connexion WiFi, acquisition GPS/IMU/BLE et envoi TCP des mesures. \\
 \texttt{TrackrAIAcceptanceTests/} & Tests d'acceptation automatisés. \\
-\texttt{docs/} & Documentation de développement, tests et limites techniques. \\
-\texttt{deliverables/} & Checklist technique de rendu. \\
+\texttt{docs/} & Documentation complémentaire sur l'intégration continue GitLab/Jenkins. \\
+\texttt{DEV.md} & Guide de lancement, tests rapides, comptes de démonstration, reset de base, Swagger et procédure ESP32. \\
 \bottomrule
 \end{longtable}
 
@@ -201,6 +201,7 @@ Les variables d'environnement principales sont :
 \texttt{PORT} & Port HTTP de l'API. \\
 \texttt{CENTRAL\_HOST}, \texttt{CENTRAL\_PORT} & Adresse du serveur central depuis les services internes. \\
 \texttt{SERVICE\_SECRET} & Secret partagé utilisé par les appels internes Java/API. \\
+\texttt{JWT\_SECRET} & Secret utilisé par l'API pour signer et vérifier les access tokens JWT. \\
 \texttt{USER\_ACCESS\_TOKEN\_TTL\_MINUTES} & Durée de validité de l'access token utilisateur. \\
 \texttt{USER\_REFRESH\_TOKEN\_TTL\_DAYS} & Durée de validité du refresh token utilisateur. \\
 \texttt{WS\_HOST}, \texttt{WS\_PORT} & Adresse d'écoute du serveur WebSocket d'analyse vidéo. \\
@@ -220,9 +221,9 @@ Le répertoire \texttt{WebTrackr/src} contient les vues, composants, services et
 \toprule
 \textbf{Élément} & \textbf{Rôle} \\
 \midrule
-\texttt{views/} & Pages principales : tableau de bord sportif, historique, détail séance, administration, coach, analyse vidéo. \\
+\texttt{views/} & Pages principales : tableau de bord sportif, historique, détail séance avec mode direct, comparaison de séances, administration, coach, analyse vidéo avec historique intégré. \\
 \texttt{components/} & Composants réutilisables : navigation, graphiques, cartes statistiques. \\
-\texttt{services/api.service.js} & Client Axios, ajout de l'access token, refresh automatique sur réponse 401. \\
+\texttt{services/api.service.js} & Client Axios, ajout du JWT dans \texttt{Authorization: Bearer}, compatibilité \texttt{x-session-id}, refresh automatique sur réponse 401. \\
 \texttt{services/auth.service.js} & Connexion, déconnexion, refresh token et vérification de session. \\
 \texttt{services/analysis.ws.js} & Connexion WebSocket au serveur d'analyse vidéo. \\
 \texttt{store/auth.store.js} & Stockage de l'identité utilisateur, des droits, de l'access token et du refresh token. \\
@@ -235,8 +236,8 @@ Le répertoire \texttt{WebTrackr/src} contient les vues, composants, services et
 Trois profils sont représentés :
 
 \begin{itemize}
-  \item \textbf{sportif} : consultation du tableau de bord, lancement de séance, historique, analyse vidéo ;
-  \item \textbf{coach} : consultation des sportifs suivis, comparaison, accès aux analyses du périmètre affecté ;
+  \item \textbf{sportif} : consultation du tableau de bord, lancement de séance, historique, comparaison de deux séances, analyse vidéo ;
+  \item \textbf{coach} : consultation des sportifs suivis, accès au live d'une séance active, comparaison de séances, accès aux analyses du périmètre affecté ;
   \item \textbf{administrateur} : gestion des utilisateurs, modules et affectations coach/sportif.
 \end{itemize}
 
@@ -247,8 +248,9 @@ Les gardes Vue Router empêchent l'accès aux pages non compatibles avec le rôl
 Le frontend conserve deux jetons :
 
 \begin{itemize}
-  \item un access token court, envoyé dans l'en-tête \texttt{x-session-id} ;
-  \item un refresh token long, utilisé uniquement sur \texttt{POST /auth/refresh}.
+  \item un access token JWT court, signé par l'API et envoyé en priorité dans l'en-tête \texttt{Authorization: Bearer} ;
+  \item une copie de compatibilité envoyée dans \texttt{x-session-id} ;
+  \item un refresh token long, opaque, utilisé uniquement sur \texttt{POST /auth/refresh}.
 \end{itemize}
 
 Lorsqu'une requête API renvoie \texttt{401}, le client Axios tente un refresh. Si le refresh réussit, l'access token est remplacé et la requête initiale est rejouée. Si le refresh échoue, les données locales d'authentification sont supprimées et l'utilisateur est redirigé vers la page de connexion.
@@ -288,15 +290,16 @@ Une valeur \texttt{error} différente de zéro indique une erreur applicative. L
 
 \subsubsection{Authentification et sécurité}
 
-L'authentification repose sur un couple access token / refresh token :
+L'authentification repose sur un couple access token JWT / refresh token :
 
 \begin{itemize}
-  \item \texttt{POST /auth/signin} vérifie le mot de passe avec bcrypt et crée les deux jetons ;
-  \item l'access token est stocké en base dans le champ \texttt{sessionId} ;
-  \item le refresh token est stocké en base dans le champ \texttt{refreshToken} ;
-  \item chaque jeton possède une date d'expiration ;
-  \item \texttt{POST /auth/refresh} remplace les deux jetons, ce qui invalide l'ancien refresh token ;
-  \item \texttt{POST /auth/logout} supprime les deux jetons en base.
+  \item \texttt{POST /auth/signin} vérifie le mot de passe avec bcrypt ;
+  \item l'API crée un identifiant de session \texttt{jti}, stocké en base dans le champ \texttt{sessionId} ;
+  \item l'access token est un JWT signé avec \texttt{JWT\_SECRET}. Il contient notamment \texttt{sub}, \texttt{login}, \texttt{rights}, \texttt{jti} et \texttt{exp} ;
+  \item \texttt{verifyToken} vérifie la signature JWT puis contrôle que le couple \texttt{sub}/\texttt{jti} existe toujours en base ;
+  \item le refresh token reste opaque et stocké en base dans le champ \texttt{refreshToken} ;
+  \item \texttt{POST /auth/refresh} renouvelle le JWT, le \texttt{jti} et le refresh token, ce qui invalide les anciens jetons ;
+  \item \texttt{POST /auth/logout} supprime le \texttt{jti} et le refresh token côté serveur.
 \end{itemize}
 
 Les routes internes appelées par le serveur central sont protégées par l'en-tête \texttt{x-service-secret}. Cette protection évite qu'une écriture de mesure ou un auto-enregistrement de module soit accepté depuis un client HTTP externe non autorisé.
@@ -336,6 +339,9 @@ GET & \texttt{/ai/insights/:sessionId} & access token & Explications IA d'une s�
 \bottomrule
 \end{longtable}
 
+\subsubsection{Documentation OpenAPI / Swagger}
+
+Une documentation Swagger est servie directement par l'API via \texttt{/trackrapi/api-docs}, à partir d'une configuration \texttt{swagger-jsdoc} située dans \texttt{TrackrAPI/config/swaggerConfig.js}. Elle permet de tester les routes publiques, les routes protégées par \texttt{Authorization: Bearer <JWT>}, le renouvellement par refresh token et les routes internes protégées par \texttt{x-service-secret}. Cette documentation sert également de support technique pour expliciter les contrats HTTP du POC.
 \subsection{Base de données MongoDB}
 
 \subsubsection{Collections}
@@ -459,7 +465,7 @@ Le serveur d'analyse reçoit la vidéo par WebSocket. Le protocole est constitu�
   \item \texttt{END\_ANALYSIS} : finalise le fichier temporaire et lance l'analyse.
 \end{enumerate}
 
-Après analyse, le résultat est renvoyé au client puis transmis au serveur central avec \texttt{STOREANALYSIS}. Le serveur central le relaie ensuite vers l'API, qui le stocke dans la collection \texttt{measures} avec un \texttt{analysisId}.
+Après analyse, le résultat est renvoyé au client. Le frontend le sauvegarde ensuite via une route API authentifiée afin d'alimenter immédiatement l'historique visible par l'utilisateur. Le serveur d'analyse conserve également le chemin historique de transmission vers le serveur central avec \texttt{STOREANALYSIS}, ce qui permet de rester compatible avec l'architecture initiale.
 
 \subsubsection{Organisation}
 
@@ -551,7 +557,7 @@ Les règles principales sont :
 
 \subsection{Gestion access token / refresh token}
 
-Le système d'authentification utilise deux jetons. L'access token est court et transmis dans les requêtes courantes. Le refresh token est plus long et permet d'obtenir un nouvel access token sans nouvelle saisie du mot de passe. Lors d'un refresh, le refresh token est également renouvelé, ce qui invalide l'ancien jeton. La déconnexion supprime les deux jetons côté serveur.
+Le système d'authentification utilise deux jetons. L'access token est un JWT court, signé côté API et transmis dans les requêtes courantes via \texttt{Authorization: Bearer}. Le champ \texttt{jti} du JWT est stocké côté serveur afin de permettre la révocation lors d'un logout ou d'un refresh. Le refresh token est opaque, plus long, stocké en base et permet d'obtenir un nouveau JWT sans nouvelle saisie du mot de passe. Lors d'un refresh, le refresh token et le \texttt{jti} sont également renouvelés, ce qui invalide les anciens jetons.
 
 En environnement de démonstration, les durées sont :
 
@@ -592,10 +598,10 @@ Les tests manuels prioritaires sont :
 
 \begin{enumerate}
   \item connexion administrateur et affectation d'un coach à un sportif ;
-  \item connexion coach et vérification du filtre \og mes sportifs \fg{} ;
+  \item connexion coach et vérification du filtre \og mes sportifs \fg{}, de l'accès live à une séance active et de la comparaison de séances ;
   \item connexion sportif et vérification du coach référent ;
   \item démarrage et arrêt d'une séance avec un module ESP32 ;
-  \item upload d'une vidéo et consultation de l'analyse dans l'historique ;
+  \item upload d'une vidéo, consultation du résultat et de l'historique intégré sur la même page ;
   \item vérification des indicateurs de qualité GPS/pas sur une nouvelle séance.
 \end{enumerate}
 
@@ -666,3 +672,6 @@ Bouton BOOT & GPIO 0 & Réinitialisation longue de la configuration. \\
 \end{itemize}
 
 \end{document}
+
+
+

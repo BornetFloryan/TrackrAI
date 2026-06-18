@@ -26,7 +26,7 @@
       </div>
 
       <div style="margin-top:.75rem">
-        <button @click="reload" :disabled="loading">
+        <button @click="reload()" :disabled="loading">
           Filtrer
         </button>
       </div>
@@ -89,9 +89,18 @@
 
           <hr class="hr" />
 
-          <router-link :to="`/sessions/${s._id}`">
-            Voir le détail →
-          </router-link>
+                    <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;">
+            <button
+              v-if="isLiveSession(s)"
+              type="button"
+              @click="goLive(s)"
+            >
+              Voir la séance en direct
+            </button>
+            <router-link :to="`/sessions/${s._id}`">
+              Voir le détail →
+            </router-link>
+          </div>
         </div>
       </div>
     </template>
@@ -99,14 +108,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useSessionStore } from '../store/session.store'
 import { useUserStore } from '../store/user.store'
+import { useRouter } from 'vue-router'
 import StatCard from '../components/StatCard.vue'
 import CoachComparisonChart from '../components/CoachComparisonChart.vue'
 
 const sessionStore = useSessionStore()
 const userStore = useUserStore()
+const router = useRouter()
 
 const athletes = ref([])
 const sessions = ref([])
@@ -116,6 +127,7 @@ const dateFrom = ref('')
 const dateTo = ref('')
 const loading = ref(false)
 const metric = ref('score')
+let refreshPoller = null
 
 onMounted(async () => {
   await userStore.fetch()
@@ -123,6 +135,11 @@ onMounted(async () => {
     u.rights.includes('basic') && isAssignedToCurrentCoach(u)
   )
   await reload()
+  refreshPoller = setInterval(() => reload({ silent: true }), 5000)
+})
+
+onUnmounted(() => {
+  if (refreshPoller) clearInterval(refreshPoller)
 })
 
 function coachId(user) {
@@ -135,8 +152,9 @@ function isAssignedToCurrentCoach(user) {
   return String(coachId(user)) === String(currentUserId)
 }
 
-async function reload() {
-  loading.value = true
+async function reload(options = {}) {
+  const silent = options?.silent === true
+  if (!silent) loading.value = true
   try {
     let list = await sessionStore.fetchHistory()
 
@@ -161,7 +179,7 @@ async function reload() {
       steps: s.stats?.steps ?? 0,
     }))
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -178,6 +196,15 @@ function fmt(v) {
   return v == null ? '—' : Math.round(v)
 }
 
+function isLiveSession(session) {
+  return !!session && !session.endDate
+}
+
+function goLive(session) {
+  if (!session?._id) return
+  router.push(`/sessions/${session._id}`)
+}
+
 const distanceLabel = computed(() =>
   `${sessions.value.reduce((a, s) => a + (s.stats?.distanceKm || 0), 0).toFixed(2)} km`
 )
@@ -186,3 +213,8 @@ const stepsLabel = computed(() =>
   `${sessions.value.reduce((a, s) => a + (s.stats?.steps || 0), 0)}`
 )
 </script>
+
+
+
+
+

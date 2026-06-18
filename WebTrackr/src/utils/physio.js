@@ -7,37 +7,52 @@ export function movingAverage(series, window = 5) {
 }
 
 export function estimateSteps(accX, accY, accZ) {
-  accX = movingAverage(accX, 5);
-  accY = movingAverage(accY, 5);
-  accZ = movingAverage(accZ, 5);
-  accX = removeGravity(accX);
-  accY = removeGravity(accY);
-  accZ = removeGravity(accZ);
+  const merged = mergeByTime(
+    movingAverage(accX, 3),
+    movingAverage(accY, 3),
+    movingAverage(accZ, 3)
+  );
 
-  const merged = mergeByTime(accX, accY, accZ);
-  if (merged.length < 10) return 0;
+  if (merged.length < 6) return 0;
+
+  const magnitudes = merged.map((p) => ({
+    t: p.t,
+    value: Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z),
+  }));
+
+  const baseline = median(magnitudes.map((p) => p.value));
+  const centered = magnitudes.map((p) => ({ ...p, value: Math.abs(p.value - baseline) }));
+  const noise = median(centered.map((p) => p.value));
+  const maxPeak = Math.max(...centered.map((p) => p.value));
+  const threshold = Math.max(noise * 2.2, maxPeak * 0.28, 8);
+  const release = threshold * 0.55;
 
   let steps = 0;
-  let above = false;
+  let armed = true;
   let lastStepT = 0;
 
-  const THRESHOLD = 250;
-
-  for (const p of merged) {
-    const mag = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
-
-    if (!above && mag > THRESHOLD && p.t - lastStepT > 300) {
+  for (const p of centered) {
+    if (armed && p.value >= threshold && p.t - lastStepT > 280) {
       steps++;
       lastStepT = p.t;
-      above = true;
+      armed = false;
     }
 
-    if (above && mag < THRESHOLD * 0.6) {
-      above = false;
+    if (!armed && p.value <= release) {
+      armed = true;
     }
   }
 
   return steps;
+}
+
+function median(values) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 function mergeByTime(x, y, z) {
@@ -86,12 +101,4 @@ export function estimateStress({ rmssd, hr }) {
 
 function clamp(v, a, b) {
   return Math.max(a, Math.min(b, v));
-}
-
-function removeGravity(series, alpha = 0.9) {
-  let g = 0;
-  return series.map((p) => {
-    g = alpha * g + (1 - alpha) * p.value;
-    return { ...p, value: p.value - g };
-  });
 }

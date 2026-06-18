@@ -5,14 +5,13 @@
     <div class="card">
       <label>Module</label>
 
-      <select v-model="moduleKey" :disabled="sessionStore.loading || moduleStoreLoading">
+      <select v-model="moduleKey" :disabled="sessionStore.loading || moduleStoreLoading || !!sessionStore.sessionId">
         <option disabled value="">
           {{ moduleStoreLoading ? 'Chargement...' : 'Sélectionner un module' }}
         </option>
         <option v-for="m in modules" :key="m._id" :value="m.key" :disabled="!m.connected">
           {{ m.name }} ({{ m.uc }}) {{ m.connected ? '🟢' : '⚪' }}
         </option>
-
       </select>
 
       <div style="display:flex; gap:.5rem; margin-top:.75rem; flex-wrap:wrap;">
@@ -28,7 +27,7 @@
       </div>
 
       <p style="color:var(--muted); margin-top:.5rem" v-if="sessionStore.sessionId">
-        Session active : <strong>{{ sessionStore.sessionId }}</strong>
+        Session active récupérée : <strong>{{ sessionStore.sessionId }}</strong>
       </p>
       <p style="color:var(--danger)" v-if="errorMsg">{{ errorMsg }}</p>
     </div>
@@ -45,6 +44,7 @@
       <Compass :heading="headingDeg" :sub="headingSub" />
     </div>
 
+
     <div class="card" style="margin-top:1rem;">
       <h3 style="margin-top:0">Carte</h3>
       <GpsMap :points="gpsPoints" />
@@ -57,13 +57,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { watch } from 'vue'
 
 import { useModuleStore } from '../store/module.store'
 import { useSessionStore } from '../store/session.store'
 import { useMeasureStore } from '../store/measure.store'
+import { useRouter } from 'vue-router'
 
 import StatCard from '../components/StatCard.vue'
 import Gauge from '../components/Gauge.vue'
@@ -74,20 +74,24 @@ import { buildGpsTrack, lastValue, measuresOf } from '../utils/measureAdapters'
 import { haversineKm, bearingDeg } from '../utils/geo'
 import { estimateSteps, estimateStress } from '../utils/physio'
 
+const HEART_RATE_TIMEOUT_MS = 45000
+
 const moduleStore = useModuleStore()
 const sessionStore = useSessionStore()
 const measureStore = useMeasureStore()
+const router = useRouter()
 const { modules } = storeToRefs(moduleStore)
 
 const moduleStoreLoading = ref(false)
 const errorMsg = ref('')
 
 const moduleKey = ref('')
-
+const measures = ref([])
 const gpsPoints = ref([])
 const elapsedMs = ref(0)
 
 const lastHr = ref(null)
+const lastHrAt = ref(null)
 const lastRmssd = ref(null)
 const lastSpeed = ref(null)
 
@@ -102,12 +106,14 @@ let timer = null
 let startedAt = null
 let modulePoller = null
 let sessionPoller = null
+let autoStopping = false
 
 onMounted(async () => {
   moduleStoreLoading.value = true
   try {
     await moduleStore.fetch()
     autoSelectConnectedModule()
+    await hydrateActiveSession()
     startModulePolling()
   } catch (e) {
     errorMsg.value = 'Impossible de charger les modules'
@@ -116,34 +122,94 @@ onMounted(async () => {
   }
 })
 
+async function hydrateActiveSession() {
+  const candidates = [
+    moduleKey.value,
+    ...modules.value.filter(m => m.connected).map(m => m.key),
+  ].filter(Boolean)
+
+  for (const key of [...new Set(candidates)]) {
+    const active = await sessionStore.syncActiveForModule(key)
+    if (active?.active) {
+      moduleKey.value = key
+      startedAt = new Date(active.startDate || Date.now()).getTime()
+      startTimer()
+      startPolling()
+      startSessionPolling()
+      return true
+    }
+  }
+
+  return false
+}
+
 async function startSession() {
   errorMsg.value = ''
   try {
-    await sessionStore.start(moduleKey.value)
-    startedAt = Date.now()
+    const started = await sessionStore.start(moduleKey.value)
+    startedAt = new Date(started?.startDate || Date.now()).getTime()
     startTimer()
     startPolling()
     startSessionPolling()
   } catch (e) {
-    errorMsg.value = sessionStore.error?.data || sessionStore.error?.message || 'Erreur démarrage session'
+    const msg = sessionStore.error?.data || sessionStore.error?.message || 'Erreur démarrage session'
+    errorMsg.value = msg
+    if (String(msg).toLowerCase().includes('active')) {
+      await hydrateActiveSession()
+    }
   }
 }
 
 async function stopSession() {
+  if (autoStopping) return
   errorMsg.value = ''
+  autoStopping = true
   try {
-    await sessionStore.stop()
+    const stopped = await sessionStore.stop()
+    await sessionStore.fetchHistory()
+
+    const sessionMongoId = stopped?.sessionMongoId || sessionStore.history?.[0]?._id
+    if (sessionMongoId) {
+      router.push(`/sessions/${sessionMongoId}`)
+    }
   } catch (e) {
     errorMsg.value = sessionStore.error?.data || sessionStore.error?.message || 'Erreur arrêt session'
   } finally {
+    autoStopping = false
     stopPolling()
     stopTimer()
     stopSessionPolling()
+    resetLiveValues()
   }
 }
 
 async function refreshNow() {
+  errorMsg.value = ''
+
+  if (!sessionStore.sessionId) {
+    const recovered = await hydrateActiveSession()
+    if (!recovered) {
+      resetLiveValues()
+      errorMsg.value = 'Aucune séance active à rafraîchir'
+    }
+    return
+  }
+
   await fetchMeasures()
+}
+
+function resetLiveValues() {
+  measures.value = []
+  gpsPoints.value = []
+  elapsedMs.value = 0
+  lastHr.value = null
+  lastHrAt.value = null
+  lastRmssd.value = null
+  lastSpeed.value = null
+  headingDeg.value = null
+  lastGpsLabel.value = ''
+  stepsValue.value = 0
+  stressValue.value = null
 }
 
 function dedupeGps(points, minMoveMeters = 1.5) {
@@ -159,14 +225,30 @@ function dedupeGps(points, minMoveMeters = 1.5) {
   return out
 }
 
+function lastMeasurePoint(list, type, { positiveOnly = false } = {}) {
+  let points = measuresOf(list, type)
+  if (positiveOnly) points = points.filter(p => p.value > 0)
+  return points.length ? points[points.length - 1] : null
+}
+
 async function fetchMeasures() {
-  if (!moduleKey.value) return
+  if (!moduleKey.value || !sessionStore.sessionId) {
+    resetLiveValues()
+    return
+  }
 
-  const list = await measureStore.fetch(moduleKey.value)
+  const since = sessionStore.startDate || new Date(Date.now() - 60_000).toISOString()
+  const list = await measureStore.fetch(moduleKey.value, since)
+  measures.value = list
 
-  lastHr.value = lastValue(list, 'heart_rate')
-  lastRmssd.value = lastValue(list, 'rmssd')
-  lastSpeed.value = lastValue(list, 'gps_speed')
+  const hrPoint = lastMeasurePoint(list, 'heart_rate', { positiveOnly: true })
+  const rmssdPoint = lastMeasurePoint(list, 'rmssd')
+  const speedPoint = lastMeasurePoint(list, 'gps_speed')
+
+  lastHr.value = hrPoint?.value ?? null
+  lastHrAt.value = hrPoint?.date ?? null
+  lastRmssd.value = rmssdPoint?.value ?? lastValue(list, 'rmssd')
+  lastSpeed.value = speedPoint?.value ?? lastValue(list, 'gps_speed')
 
   const track = buildGpsTrack(list)
   const rawPoints = track.map(p => [p.lat, p.lon])
@@ -194,6 +276,30 @@ async function fetchMeasures() {
   stepsValue.value = estimateSteps(ax, ay, az)
 
   stressValue.value = estimateStress({ rmssd: lastRmssd.value, hr: lastHr.value })
+
+  await stopIfHeartRateLost()
+}
+
+async function stopIfHeartRateLost() {
+  if (!sessionStore.sessionId || autoStopping) return
+
+  const base = startedAt || Date.now()
+  const sessionAge = Date.now() - base
+  if (sessionAge <= HEART_RATE_TIMEOUT_MS) return
+
+  const lastPositiveHr = lastHrAt.value || sessionStore.lastHeartRateAt
+  if (!lastPositiveHr) {
+    errorMsg.value = 'Fréquence cardiaque absente — arrêt automatique de la séance'
+    await stopSession()
+    return
+  }
+
+  const idle = Date.now() - new Date(lastPositiveHr).getTime()
+  if (idle > HEART_RATE_TIMEOUT_MS) {
+    lastHr.value = null
+    errorMsg.value = 'Fréquence cardiaque perdue — arrêt automatique de la séance'
+    await stopSession()
+  }
 }
 
 function startPolling() {
@@ -210,12 +316,15 @@ function startModulePolling() {
   stopModulePolling()
   modulePoller = setInterval(async () => {
     await moduleStore.fetch({ silent: true })
-    autoSelectConnectedModule()
+    if (!sessionStore.sessionId) {
+      autoSelectConnectedModule()
+      await hydrateActiveSession()
+    }
   }, 2000)
 }
 
 function stopModulePolling() {
-  if (typeof modulePoller !== 'undefined' && modulePoller) {
+  if (modulePoller) {
     clearInterval(modulePoller)
     modulePoller = null
   }
@@ -238,8 +347,10 @@ function startSessionPolling() {
 
     const res = await sessionStore.syncActiveForModule(moduleKey.value)
     if (!res?.active) {
+      errorMsg.value = 'La séance active a été arrêtée côté serveur'
       stopPolling()
       stopTimer()
+      stopSessionPolling()
     }
   }, 2000)
 }
@@ -249,11 +360,10 @@ function stopSessionPolling() {
   sessionPoller = null
 }
 
-
 function startTimer() {
   stopTimer()
   timer = setInterval(() => {
-    elapsedMs.value = Date.now() - startedAt
+    elapsedMs.value = Math.max(0, Date.now() - (startedAt || Date.now()))
   }, 500)
 }
 function stopTimer() {
@@ -278,15 +388,17 @@ const elapsedLabel = computed(() => {
 
 const lastHrValue = computed(() => {
   if (!Number.isFinite(lastHr.value) || lastHr.value <= 0) return '--'
+  if (lastHrAt.value && Date.now() - new Date(lastHrAt.value).getTime() > HEART_RATE_TIMEOUT_MS) return '--'
   return Math.round(lastHr.value)
 })
 
 const hrHint = computed(() => {
-  if (lastHrValue.value === '--') return 'Capteur non connecté'
+  if (lastHrValue.value === '--') return 'Capteur cardio non connecté'
   if (lastHrValue.value < 90) return 'Zone facile'
   if (lastHrValue.value < 140) return 'Zone modérée'
   return 'Zone intense'
 })
+
 
 const distanceKm = computed(() => {
   if (gpsPoints.value.length < 2) return 0
@@ -320,17 +432,14 @@ const headingSub = computed(() => {
 
 watch(
   () => modules.value,
-  (mods) => {
-    if (!sessionStore.sessionId) return
+  async (mods) => {
+    if (!sessionStore.sessionId || autoStopping) return
 
     const current = mods.find(m => m.key === moduleKey.value)
     if (current && !current.connected) {
-      errorMsg.value = 'Module déconnecté — session arrêtée'
-      sessionStore.sessionId = null
-      stopPolling()
-      stopTimer()
+      errorMsg.value = 'Module déconnecté — arrêt automatique de la séance'
+      await stopSession()
     }
-
   },
   { deep: true }
 )

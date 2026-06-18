@@ -11,6 +11,10 @@
     <div class="card" v-if="loading">Chargement…</div>
 
     <template v-else>
+      <div v-if="isLiveSession" class="card live-card">
+        <strong>Séance en direct</strong>
+        <span class="muted">Les mesures sont rafraîchies automatiquement toutes les 5 secondes.</span>
+      </div>
       <div class="grid grid-3">
         <StatCard title="Durée" :value="durationLabel" :sub="dureeSub" />
         <StatCard title="Distance" :value="distanceLabel" :sub="gpsQualityLabel" />
@@ -82,7 +86,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useMeasureStore } from '../store/measure.store'
 import { useSessionStore } from '../store/session.store'
 import { buildGpsTrack, measuresOf } from '../utils/measureAdapters'
@@ -103,27 +107,56 @@ const measureStore = useMeasureStore()
 const sessionStore = useSessionStore()
 const loading = ref(false)
 const measures = ref([])
+let livePoller = null
 
 const gpsPoints = ref([])
+
+async function loadMeasures() {
+  const after = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
+  const all = await measureStore.fetch(null, after, null)
+  measures.value = all.filter(m => String(m.session) === String(props.sessionMongoId))
+  measures.value.sort((a, b) => new Date(a.date) - new Date(b.date))
+
+  const track = buildGpsTrack(measures.value)
+  gpsPoints.value = track.map(p => [p.lat, p.lon])
+}
+
+function stopLivePolling() {
+  if (livePoller) clearInterval(livePoller)
+  livePoller = null
+}
+
+function startLivePolling() {
+  stopLivePolling()
+  livePoller = setInterval(async () => {
+    await sessionStore.fetchHistory()
+    await loadMeasures()
+    if (!isLiveSession.value) stopLivePolling()
+  }, 5000)
+}
 
 onMounted(async () => {
   loading.value = true
   try {
-    const after = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
-    const all = await measureStore.fetch(null, after, null)
-    measures.value = all.filter(m => String(m.session) === String(props.sessionMongoId))
-    measures.value.sort((a, b) => new Date(a.date) - new Date(b.date))
-
-    const track = buildGpsTrack(measures.value)
-    gpsPoints.value = track.map(p => [p.lat, p.lon])
+    if (!sessionStore.history?.length || !session.value) {
+      await sessionStore.fetchHistory()
+    }
+    await loadMeasures()
+    if (isLiveSession.value) startLivePolling()
   } finally {
     loading.value = false
   }
 })
 
+onUnmounted(() => {
+  stopLivePolling()
+})
+
 const session = computed(() =>
   sessionStore.history.find(s => s._id === props.sessionMongoId)
 )
+
+const isLiveSession = computed(() => !!session.value && !session.value.endDate)
 
 const stats = computed(() => session.value?.stats ?? null)
 
@@ -177,9 +210,10 @@ const stress = computed(() => {
   return estimateStress({ rmssd, hr: hrAvg })
 })
 
-const stressLabel = computed(() =>
-  stats.value?.stress ?? '—'
-)
+const stressLabel = computed(() => {
+  const value = stats.value?.stress ?? stress.value
+  return Number.isFinite(value) ? Math.round(value) : '—'
+})
 
 const weightLabel = computed(() => {
   if (!stats.value?.score?.weights) return '—'
@@ -187,15 +221,19 @@ const weightLabel = computed(() => {
   return `${w.wLoad * 100}% / ${w.wIntensity * 100}% / ${w.wRecovery * 100}%`
 })
 
-const stressSub = computed(() =>
-  stats.value?.quality?.steps
-    ? `Pas: ${stats.value.steps ?? 0} - ${stats.value.quality.steps.message} (${stats.value.quality.steps.confidence}% confiance)`
-    : stats.value?.steps ? `Pas estimés: ${stats.value.steps}` : ''
-)
+const stressSub = computed(() => {
+  if (stats.value?.quality?.steps) {
+    return `Pas: ${stats.value.steps ?? 0} - ${stats.value.quality.steps.message} (${stats.value.quality.steps.confidence}% confiance)`
+  }
+  if (stats.value?.steps) return `Pas estimés: ${stats.value.steps}`
+  if (isLiveSession.value && stress.value != null) return 'Estimation live basée sur RMSSD / cardio'
+  return ''
+})
 
-const dureeSub = computed(() =>
-  stats.value.score.global ? `Score: ${stats.value.score.global.toFixed(2)}` : ''
-)
+const dureeSub = computed(() => {
+  if (isLiveSession.value) return 'En cours'
+  return stats.value?.score?.global ? `Score: ${stats.value.score.global.toFixed(2)}` : ''
+})
 
 function goBack() {
   if (window.history.length > 1) {
@@ -205,3 +243,18 @@ function goBack() {
   }
 }
 </script>
+
+
+<style scoped>
+.live-card {
+  display: flex;
+  gap: .75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  border-color: rgba(34, 197, 94, .45);
+}
+</style>
+
+
+
+
