@@ -1,186 +1,197 @@
-# DEV - Lancement et tests TrackrAI
+# Développement TrackrAI
 
-Ce document resume les commandes utiles pour lancer TrackrAI en developpement, en production et en CI. Le projet est prevu pour fonctionner sous Linux natif ou sous Windows avec WSL 2 / Docker Desktop.
+Ce document décrit l’installation et l’exécution locale de TrackrAI pour reprendre ou modifier le projet.
 
-## Prerequis
+## Prérequis
 
-- Docker 24 ou plus recent
-- Docker Compose v2 (`docker compose`)
-- Git
-- Pour l'ESP32 : Arduino IDE ou PlatformIO, avec l'adresse IP de la machine Docker dans le firmware
+| Outil | Version conseillée | Usage |
+|---|---:|---|
+| Git | récente | récupération du dépôt |
+| Docker Engine | 24+ | conteneurisation des services |
+| Docker Compose | v2 | orchestration locale |
+| Node.js | 20 | API et frontend |
+| Java JDK | 21 | serveur central |
+| Python | 3.10 | serveur d’analyse vidéo et scripts IA |
+| Maven | 3.x | tests d’acceptation |
+| PlatformIO | compatible ESP32 | firmware ESP32 |
+| Android Studio | récent | build Android Capacitor |
 
-## Lancement en developpement
+Pour l’ESP32, l’adresse du serveur central n’est pas codée en dur dans le firmware. Elle est configurée depuis le portail WiFiManager du boîtier, puis stockée en mémoire persistante.
 
-Depuis la racine du depot :
+## Récupération du dépôt
+
+```bash
+git clone https://gitlab.iut-bm.univ-fcomte.fr/fbornet/TrackrAI.git
+cd TrackrAI
+```
+
+## Lancement complet avec Docker Compose
+
+### Développement
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-Services exposes :
+Accès :
 
-- Frontend Vite : http://localhost:5173
-- API Node : http://localhost:4567/trackrapi
-- Serveur central TCP : localhost:29000
-- Serveur analyse video WebSocket : ws://localhost:6000
-- MongoDB : localhost:27017
+| Service | URL / port |
+|---|---|
+| Frontend Vite | `http://localhost:5173` |
+| API | `http://localhost:4567/trackrapi` |
+| Swagger | `http://localhost:4567/trackrapi/api-docs` |
+| Serveur central TCP | `localhost:29000` |
+| Serveur d’analyse | `ws://localhost:6000` |
+| MongoDB | `localhost:27017` |
 
-Le frontend de developpement installe ses dependances dans un volume Docker dedie afin d'eviter les problemes de binaires npm entre Windows, Linux et les conteneurs.
-
-## Lancement en production locale
-
-```bash
-docker compose -f docker-compose.yml up --build
-```
-
-Services exposes :
-
-- Frontend servi par Nginx : http://localhost:8080
-- API Node : http://localhost:4567/trackrapi
-- Serveur central TCP : localhost:29000
-- Serveur analyse video : ws://localhost:6000
-
-En production, le frontend est compile puis servi par Nginx. L'API et MongoDB restent des services separes.
-
-## Arret
+Arrêt simple :
 
 ```bash
 docker compose -f docker-compose.dev.yml down
-docker compose -f docker-compose.yml down
 ```
 
-## Reset complet de la base
-
-Attention : cette commande supprime les donnees MongoDB du compose concerne.
+Arrêt avec suppression du volume MongoDB :
 
 ```bash
 docker compose -f docker-compose.dev.yml down -v
+```
+
+### Exécution locale de production
+
+```bash
+docker compose -f docker-compose.yml up --build -d
+```
+
+Accès :
+
+| Service | URL / port |
+|---|---|
+| Frontend Nginx | `http://localhost:8080` |
+| API via proxy | `http://localhost:8080/trackrapi` |
+| Swagger via proxy | `http://localhost:8080/trackrapi/api-docs` |
+| WebSocket via proxy | `ws://localhost:8080/ws` |
+| Serveur central TCP | `localhost:29000` |
+
+## Exécution sans Docker
+
+### API Node.js
+
+```bash
+cd TrackrAPI
+npm install
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r ai/requirements.txt
+npm run dev
+```
+
+L’API écoute par défaut sur `http://localhost:4567/trackrapi`.
+
+### Frontend Vue
+
+```bash
+cd WebTrackr
+npm install
+npm run dev
+```
+
+Le frontend écoute par défaut sur `http://localhost:5173`.
+
+### Serveur central Java
+
+```bash
+cd CentralServer
+javac -cp "lib/*" server/src/*.java client/src/*.java
+java -cp "lib/*:server/src:client/src" TrackrCentralServer 29000
+```
+
+Sous Windows, remplacer `:` par `;` dans le classpath.
+
+### Serveur d’analyse Python
+
+```bash
+cd AnalyzeServer
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+Le serveur d’analyse écoute par défaut sur `ws://localhost:6000`.
+
+## Configuration du boîtier ESP32
+
+Le firmware est situé dans `arduino/`. Il est prévu pour PlatformIO avec l’environnement `esp32dev`.
+
+Au premier démarrage, le boîtier crée un point d’accès de configuration. Le portail WiFiManager demande :
+
+- le SSID Wi-Fi ;
+- le mot de passe Wi-Fi ;
+- l’adresse IP ou le nom de la machine hébergeant le serveur central ;
+- le port TCP du serveur central, généralement `29000`.
+
+Le bouton BOOT maintenu pendant cinq secondes efface la configuration Wi-Fi, l’adresse du serveur et la clé du module.
+
+## Application Android
+
+```bash
+cd WebTrackr
+npm install
+npm run build
+npx cap sync android
+npx cap open android
+```
+
+`capacitor.config.json` correspond à la configuration standard. `capacitor.config.dev.json` peut être utilisé pour pointer l’application Android vers le serveur Vite pendant le développement.
+
+## Tests
+
+Les tests d’acceptation s’exécutent depuis `TrackrAIAcceptanceTests` :
+
+```bash
+cd TrackrAIAcceptanceTests
+mvn -B test
+```
+
+Variables utiles :
+
+| Variable | Rôle | Valeur par défaut fréquente |
+|---|---|---|
+| `API_BASE_URL` | URL de l’API testée | `http://localhost:4567/trackrapi` |
+| `CENTRAL_HOST` | hôte du serveur central | `localhost` |
+| `CENTRAL_PORT` | port TCP du serveur central | `29000` |
+
+## Intégration continue
+
+Deux configurations sont présentes :
+
+- `.gitlab-ci.yml` pour GitLab CI ;
+- `Jenkinsfile` pour Jenkins.
+
+Les deux pipelines utilisent `docker-compose.ci.yml`, construisent les services, vérifient leur disponibilité puis exécutent les tests Maven. Ils assurent l’intégration continue, mais ne déploient pas automatiquement l’application en production.
+
+## Éléments à exclure d’une archive finale
+
+```text
+.idea/
+.vscode/
+*.iml
+AnalyzeServer/dev/
+TrackrAPI/ai/notebook/
+node_modules/
+dist/
+target/
+coverage/
+*.log
+```
+
+Les fichiers `AnalyzeServer/dev/test_squat.mp4` et `AnalyzeServer/dev/ws_client_test.py` sont utiles pour des essais locaux, mais ne doivent pas être conservés dans une archive de rendu sauf justification explicite.
+
+## Vérifications rapides avant rendu
+
+```bash
+docker compose -f docker-compose.dev.yml config
 docker compose -f docker-compose.dev.yml up --build
-```
-
-Pour la production locale :
-
-```bash
-docker compose -f docker-compose.yml down -v
-docker compose -f docker-compose.yml up --build
-```
-
-
-## Configuration ESP32
-
-L'ESP32 utilise WiFiManager. Pour reconfigurer le WiFi, l'adresse du serveur ou la clé module :
-
-1. Allumer l'ESP32.
-2. Maintenir **BOOT** environ 5 secondes au démarrage pour effectuer un reset de configuration.
-3. Se connecter au point d'accès WiFi créé par l'ESP32 :
-
-```text
-Trackr-ESP32
-```
-
-4. Dans le portail WiFiManager, choisir le WiFi à utiliser et renseigner :
-
-```text
-Server host : IP de la machine qui lance Docker
-Server port : 29000
-```
-
-Exemple :
-
-```text
-Server host : 192.168.31.100
-Server port : 29000
-```
-
-5. Valider. L'ESP32 sauvegarde la configuration en mémoire flash et s'auto-enregistre au serveur central si nécessaire.
-
-## Tests rapides avant demo
-
-Verifier la configuration Docker :
-
-```bash
-docker compose -f docker-compose.dev.yml config --quiet
-docker compose -f docker-compose.yml config --quiet
-docker compose -f docker-compose.ci.yml config --quiet
-```
-
-Verifier l'API :
-
-```bash
 curl http://localhost:4567/trackrapi/health
+cd TrackrAIAcceptanceTests && mvn -B test
 ```
-
-Verifier le build frontend depuis le conteneur de developpement :
-
-```bash
-docker compose -f docker-compose.dev.yml exec frontend npm run build
-```
-
-Verifier la syntaxe des principaux fichiers API :
-
-```bash
-docker compose -f docker-compose.dev.yml exec trackr-api node --check controllers/auth.controller.js
-docker compose -f docker-compose.dev.yml exec trackr-api node --check controllers/session.controller.js
-docker compose -f docker-compose.dev.yml exec trackr-api node --check TrackrAPI.js
-```
-
-## Scenario de demo conseille
-
-1. Se connecter en administrateur et affecter un coach a un sportif.
-2. Se connecter en sportif, lancer une seance avec l'ESP32, observer les mesures en direct puis arreter la seance.
-3. Ouvrir le detail de la seance : statistiques, prévision cardiaque XGBoost, stress, graphiques et GPS si disponible.
-4. Se connecter en coach, ouvrir la page des sportifs suivis et acceder a la seance en direct si elle est active.
-5. Comparer deux seances terminees depuis l'onglet Comparer.
-6. Lancer une analyse video depuis la page Analyse video et verifier son apparition dans l'historique.
-
-
-## Documentation API Swagger
-
-La documentation Swagger est servie directement par l'API :
-
-```text
-http://localhost:4567/trackrapi/api-docs
-http://localhost:5173/trackrapi/api-docs
-```
-
-Le JSON OpenAPI généré est disponible ici :
-
-```text
-http://localhost:4567/trackrapi/swagger.json
-```
-
-Pour tester les routes securisees :
-
-1. appeler `POST /auth/signin` avec un utilisateur de demo ;
-2. copier `data.token` dans `Authorize` / `jwt` ;
-3. tester les routes protegees ;
-4. appeler `POST /auth/refresh` avec `data.refreshToken` dans le body ou `x-refresh-token`.
-
-Comptes de demo initialises en base :
-
-- `admin` / `admin`
-- `coach` / `coach`
-- `test` / `azer`
-- `thomas` / `thomas`
-- `lea` / `lea`
-- `floryan` / `floryan` (coach de demo)
-- `corentin` / `corentin` (sportif suivi par floryan)
-
-## CI GitLab / Jenkins
-
-- `Jenkinsfile` : pipeline Jenkins avec validation Compose, build, healthchecks et tests d'acceptation Maven.
-- `.gitlab-ci.yml` : pipeline GitLab CI equivalent pour un runner Docker.
-- `docker-compose.ci.yml` : environnement ephemere utilise par la CI.
-
-## Elements a exclure de l'archive
-
-Ne pas inclure dans l'archive de rendu :
-
-- `node_modules/`
-- `.venv/`
-- `dist/`
-- volumes Docker et caches locaux
-- `.git/`
-- fichiers `.env` reels contenant des secrets
-
-Les fichiers `.env.example` doivent rester dans l'archive car ils documentent la configuration attendue.

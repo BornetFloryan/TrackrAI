@@ -1,722 +1,1296 @@
 \documentclass[11pt,a4paper]{article}
 
+% -----------------------------------------------------------------------------
+% Encodage, langue et typographie
+% -----------------------------------------------------------------------------
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[french]{babel}
-\usepackage{geometry}
-\usepackage{longtable}
+\usepackage[scaled=0.96]{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{microtype}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{indentfirst}
+\setlength{\parindent}{1.1cm}
+\setlength{\parskip}{0.55em}
+
+% -----------------------------------------------------------------------------
+% Mise en page
+% -----------------------------------------------------------------------------
+\usepackage[a4paper,top=2cm,bottom=2cm,left=2cm,right=2cm]{geometry}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{etoolbox}
+\usepackage{needspace}
+\usepackage{lastpage}
+
+% -----------------------------------------------------------------------------
+% Tableaux, listes et code
+% -----------------------------------------------------------------------------
 \usepackage{array}
 \usepackage{booktabs}
-\usepackage{hyperref}
-\usepackage{xcolor}
-\usepackage{listings}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{multirow}
 \usepackage{enumitem}
+\usepackage{listings}
+\usepackage{upquote}
+
+% -----------------------------------------------------------------------------
+% Illustrations, schémas et liens
+% -----------------------------------------------------------------------------
+% Seules les illustrations techniques indispensables sont conservées :
+% architecture globale, séquence de séance et pipeline vidéo.
 \usepackage{graphicx}
 \usepackage{float}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{xurl}
 
-\geometry{margin=2.4cm}
-\hypersetup{
-  colorlinks=true,
-  linkcolor=black,
-  urlcolor=blue,
-  citecolor=black
+\graphicspath{{images/}}
+
+% -----------------------------------------------------------------------------
+% Couleurs et styles
+% -----------------------------------------------------------------------------
+\definecolor{trackrred}{HTML}{E30613}
+\definecolor{trackrblue}{HTML}{168AF5}
+\definecolor{trackrgreen}{HTML}{00CC66}
+\definecolor{trackrgray}{HTML}{5F6B7A}
+\definecolor{lightgray}{HTML}{F3F4F6}
+\definecolor{codegray}{HTML}{F7F7F7}
+
+\titleformat{\section}
+  {\color{trackrred}\bfseries\fontsize{17}{20}\selectfont}
+  {\thesection}{1em}{}
+\titleformat{\subsection}
+  {\color{trackrred}\bfseries\fontsize{14}{17}\selectfont}
+  {\thesubsection}{0.9em}{}
+\titleformat{\subsubsection}
+  {\color{trackrred}\bfseries\fontsize{12}{15}\selectfont}
+  {\thesubsubsection}{0.8em}{}
+
+\titlespacing*{\section}{0pt}{0pt}{1.1em}
+\titlespacing*{\subsection}{0pt}{1.4em}{0.6em}
+\titlespacing*{\subsubsection}{0pt}{1.0em}{0.4em}
+
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+
+\addto\captionsfrench{%
+  \renewcommand{\contentsname}{Sommaire}%
+  \renewcommand{\listfigurename}{Table des illustrations}%
 }
+\renewcommand{\figurename}{Figure}
+\renewcommand{\tablename}{Tableau}
+\renewcommand{\cftfigpresnum}{Figure~}
+\settowidth{\cftfignumwidth}{Figure~99~}
+
+\captionsetup{
+  font=it,
+  labelfont=it,
+  justification=raggedright,
+  singlelinecheck=false,
+  skip=6pt
+}
+
+\setlist[itemize]{leftmargin=1.2cm,itemsep=0.15em,topsep=0.3em}
+\setlist[enumerate]{leftmargin=1.2cm,itemsep=0.2em,topsep=0.3em}
+\renewcommand{\arraystretch}{1.28}
+\setlength{\tabcolsep}{3.5pt}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 
 \lstdefinestyle{trackrcode}{
   basicstyle=\ttfamily\small,
-  breaklines=true,
+  backgroundcolor=\color{codegray},
   frame=single,
+  rulecolor=\color{black!25},
+  breaklines=true,
   columns=fullflexible,
   keepspaces=true,
-  showstringspaces=false
+  showstringspaces=false,
+  tabsize=2,
+  xleftmargin=0.4em,
+  xrightmargin=0.4em,
+  aboveskip=0.7em,
+  belowskip=0.7em
+}
+\lstset{style=trackrcode}
+
+\hypersetup{
+  colorlinks=true,
+  linktoc=all,
+  linkcolor=blue!65!black,
+  urlcolor=blue!65!black,
+  citecolor=black,
+  pdftitle={Rapport technique final - TrackrAI},
+  pdfauthor={Simon Bonnin, Floryan Bornet, Corentin Brendle, Ludovic Ertzer, Gauthier Weibel}
+}
+\urlstyle{same}
+
+% -----------------------------------------------------------------------------
+% En-tête et pied de page
+% -----------------------------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% -----------------------------------------------------------------------------
+% Table des annexes avec numérotation romaine
+% -----------------------------------------------------------------------------
+\newlistof{annexes}{lan}{Table des annexes}
+\renewcommand{\theannexes}{\Roman{annexes}}
+\renewcommand{\cftannexesfont}{\normalfont}
+\renewcommand{\cftannexespagefont}{\normalfont}
+\renewcommand{\cftannexesleader}{\cftdotfill{\cftdotsep}}
+\newcommand{\trackannex}[2]{%
+  \clearpage
+  \refstepcounter{annexes}%
+  \phantomsection
+  \addcontentsline{lan}{annexes}{Annexe \Roman{annexes} : #1}%
+  {\color{trackrred}\bfseries\fontsize{18}{22}\selectfont Annexe \Roman{annexes} : #1\par}
+  \label{#2}
+  \vspace{1em}
 }
 
-\setlist[itemize]{noitemsep, topsep=0.25em}
-\setlist[enumerate]{noitemsep, topsep=0.25em}
-\renewcommand{\arraystretch}{1.25}
+% -----------------------------------------------------------------------------
+% Commandes utilitaires
+% -----------------------------------------------------------------------------
+\newcommand{\code}[1]{\nolinkurl{#1}}
+\newcommand{\important}[1]{\textbf{#1}}
 
-\title{\textbf{Rapport technique final -- TrackrAI}}
-\author{}
-\date{\today}
+% Références entièrement cliquables : le type et le numéro appartiennent au lien.
+\newcommand{\tabref}[1]{\hyperref[#1]{tableau~\ref*{#1}}}
+\newcommand{\figref}[1]{\hyperref[#1]{figure~\ref*{#1}}}
+\newcommand{\annref}[1]{\hyperref[#1]{annexe~\ref*{#1}}}
+\newcommand{\secref}[1]{\hyperref[#1]{section~\ref*{#1}}}
 
 \begin{document}
+\pagenumbering{arabic}
+\hypersetup{pageanchor=false}
 
-\maketitle
-\tableofcontents
-\newpage
+% =============================================================================
+% PAGE DE GARDE
+% =============================================================================
+\begin{titlepage}
+  \thispagestyle{empty}
+  \begin{minipage}[t]{0.61\textwidth}
+    \vspace{0.5cm}
+    {\fontsize{28}{34}\selectfont\bfseries TrackrAI\par}
+    \vspace{0.35cm}
+    {\fontsize{18}{23}\selectfont Plateforme distribuée de suivi et d'analyse de performance sportive\par}
+    \vspace{1.2cm}
 
-\section{Introduction}
+    {\large Simon BONNIN\par}
+    {\large Floryan BORNET\par}
+    {\large Corentin BRENDLÉ\par}
+    {\large Ludovic ERTZER\par}
+    {\large Gauthier WEIBEL\par}
+    \vspace{0.45cm}
+    {\normalsize BUT Informatique, 3\textsuperscript{e} année -- Groupe 4\par}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.34\textwidth}
+    \centering
+    \vspace{0.2cm}
+    \includegraphics[width=\linewidth]{logo-trackrai.png}
+  \end{minipage}
 
-TrackrAI est une application de suivi sportif destinée à centraliser des données issues de séances physiques, à les visualiser et à fournir des éléments d'analyse au sportif ainsi qu'à son encadrement. L'application associe un module matériel à base d'ESP32, une interface web/mobile, une API, une base de données, un serveur de centralisation et un serveur d'analyse vidéo.
+  \vfill
+  {\color{trackrred}\fontsize{26}{31}\selectfont\bfseries RAPPORT TECHNIQUE FINAL\par}
+  \vspace{0.7cm}
+  {\large Version 1.1 -- 20 juin 2026\par}
+  \vspace{0.2cm}
+  {\normalsize Dépôt : \url{https://gitlab.iut-bm.univ-fcomte.fr/fbornet/TrackrAI}\par}
+\end{titlepage}
+\setcounter{page}{2}
 
-Le contexte principal d'utilisation est le suivi d'une séance d'entraînement réalisée par un sportif. Une séance peut être démarrée depuis l'interface applicative, puis alimentée par un module connecté qui transmet des mesures GPS, inertielles, cardiaques et un compteur de pas calculé localement sur l'ESP32 à partir de l'accéléromètre. Les données sont ensuite agrégées, filtrées et transformées en statistiques de séance. Le sportif consulte son historique, ses statistiques et les prévisions cardiaques, compare deux séances et voit son coach référent. Le coach consulte les sportifs qui lui sont affectés, suit une séance active en direct depuis le détail de séance et compare leurs séances avec une lecture orientée progression. L'administrateur gère les utilisateurs, les modules et les affectations coach/sportif.
+% Page blanche imposée par la mise en forme de référence
+\clearpage
+\thispagestyle{empty}
+\mbox{}
+\clearpage
 
-L'application propose également une analyse vidéo de mouvements sportifs. Le flux vidéo est envoyé à un serveur Python par WebSocket, analysé avec MediaPipe/OpenCV, puis stocké dans un historique intégré à la page d'analyse vidéo. Le squat constitue le mode d'analyse principal. Des modes expérimentaux existent pour le développé couché et le soulevé de terre.
+% =============================================================================
+% SOMMAIRE
+% =============================================================================
+\hypersetup{pageanchor=true}
+\pagestyle{empty}
+\begingroup
+  \makeatletter
+  \let\ps@plain\ps@empty
+  \makeatother
+  \tableofcontents
+\endgroup
+\clearpage
 
-Enfin, un modèle XGBoost prévoit la fréquence cardiaque moyenne de la prochaine séance comparable. La cible est une mesure réellement observée, en bpm, et non un score fabriqué. L'entraînement combine les séances locales de MongoDB et des fenêtres cardiaques et inertielles extraites de l'archive officielle PAMAP2 de l'UCI. Lorsqu'une séance comparable suivante est réalisée, l'application mesure l'erreur entre prévision et observation afin de constituer progressivement un retour propre au sportif.
+% =============================================================================
+% CORPS DU RAPPORT
+% =============================================================================
+\pagestyle{fancy}
 
+\phantomsection
+\addcontentsline{toc}{section}{Présentation de l'application}
+{\color{trackrred}\bfseries\fontsize{17}{20}\selectfont Présentation de l'application\par}
+\vspace{0.9em}
+
+TrackrAI est une plateforme distribuée destinée au suivi de séances sportives. Elle collecte des mesures physiques, les centralise, calcule des statistiques de séance et restitue ces informations dans une interface web et mobile. Le système associe un boîtier d'acquisition, plusieurs services logiciels et une base de données commune.
+
+Le boîtier repose sur un microcontrôleur ESP32 et regroupe un récepteur GPS, un module inertiel ainsi qu'une ceinture cardiaque Bluetooth Low Energy. Il transmet au serveur central les positions, la vitesse, la fréquence cardiaque, la variabilité cardiaque, les accélérations, les vitesses angulaires et un compteur de pas. Les mesures sont rattachées à une séance, persistées dans MongoDB puis agrégées par l'API.
+
+Trois profils utilisent l'application. Le sportif démarre une séance, consulte ses mesures, ses statistiques et son historique. Le coach accède aux sportifs qui lui sont affectés et à leurs séances. L'administrateur gère les utilisateurs, les affectations et les modules matériels. Un serveur Python complète la chaîne en analysant des vidéos de mouvements sportifs, principalement le squat, et en produisant un nombre de répétitions, des erreurs détectées, des conseils et un score.
+
+Le présent rapport décrit d'abord la structure logicielle et matérielle globale de TrackrAI. Il détaille ensuite le contexte nécessaire pour reproduire l'environnement de développement et d'exécution. La dernière partie présente le fonctionnement technique de chaque composant, les fichiers à modifier pour faire évoluer l'application, les tests automatisés et les limites connues.
+
+% =============================================================================
+\clearpage
 \section{Structure logicielle et matérielle globale}
-
-\subsection{Vue d'ensemble}
-
-TrackrAI est organisé en plusieurs services indépendants communiquant par HTTP, TCP, WebSocket et MongoDB. La séparation des responsabilités permet de remplacer ou d'étendre une partie de l'application sans réécrire l'ensemble du système.
-
-\begin{figure}[H]
-\centering
-\begin{verbatim}
-ESP32 + GPS + MPU6050 + ceinture cardio BLE
-        |
-        | TCP : AUTOREGISTER, HELLO, STOREMEASURE
-        v
-Serveur central Java TCP
-        |
-        | HTTP interne sécurisé par x-service-secret
-        v
-API Node.js / Express  <---- HTTP ---- Frontend Vue / Capacitor
-        |                                  |
-        | Mongoose                         | WebSocket
-        v                                  v
-MongoDB                         Serveur analyse vidéo Python
-                                      |
-                                      | TCP : STOREANALYSIS
-                                      v
-                              Serveur central Java
-\end{verbatim}
-\caption{Architecture globale de TrackrAI}
-\end{figure}
+% =============================================================================
 
 \subsection{Composants principaux}
 
-\begin{longtable}{p{3.2cm}p{3.2cm}p{7.2cm}}
+TrackrAI est constitué de six composants principaux. Le \tabref{tab:composants} précise leur nature et leur responsabilité sans détailler leur fonctionnement interne, traité dans la \secref{sec:descriptif}.
+
+\begin{longtable}{L{3.1cm}L{3.5cm}L{9.4cm}}
+\caption{Composants principaux de TrackrAI}\label{tab:composants}\\
 \toprule
-\textbf{Composant} & \textbf{Technologie} & \textbf{Rôle} \\
+\textbf{Composant} & \textbf{Technologie} & \textbf{Responsabilité} \\
 \midrule
-Frontend & Vue 3, Vite, Pinia, Chart.js, Leaflet, Capacitor & Interface sportif, coach et administrateur. Il consomme l'API HTTP et envoie les vidéos au serveur d'analyse par WebSocket. \\
-API & Node.js, Express, Mongoose & Expose les routes HTTP, applique l'authentification, contrôle les rôles, écrit et lit les données MongoDB, lance les scripts IA. \\
-Base de données & MongoDB 6 & Stocke les utilisateurs, modules, chipsets, mesures, séances, statistiques et résultats d'analyse vidéo. \\
-Serveur central & Java, sockets TCP, HttpClient & Reçoit les connexions des modules ESP32, gère l'état des sessions côté module et relaie les mesures vers l'API. \\
-Serveur d'analyse & Python, websockets, OpenCV, MediaPipe & Reçoit les vidéos, extrait les poses, calcule des métriques de mouvement et transmet le résultat au serveur central. \\
-Module matériel & ESP32, GPS, MPU6050, BLE HR & Acquiert les mesures physiques, calcule un compteur de pas embarqué à partir de l'accéléromètre et transmet les données au serveur central pendant une séance active. \\
+\endfirsthead
+\toprule
+\textbf{Composant} & \textbf{Technologie} & \textbf{Responsabilité} \\
+\midrule
+\endhead
+Boîtier d'acquisition & ESP32, GPS, MPU-9255, BLE & Acquisition des données physiques, filtrage élémentaire, comptage des pas et émission TCP pendant une séance active. \\
+Serveur central & Java 21, sockets TCP, client HTTP & Maintien des connexions persistantes avec les boîtiers, gestion de leur état local et relais des mesures vers l'API. \\
+API & Node.js 20, Express, Mongoose & Authentification, autorisations, gestion des utilisateurs et modules, création des séances, calcul des statistiques, accès MongoDB et exécution du modèle IA. \\
+Base de données & MongoDB 6.0 & Persistance des utilisateurs, chipsets, modules, séances, mesures et résultats d'analyse vidéo. \\
+Serveur d'analyse & Python 3.10, WebSocket, OpenCV, MediaPipe & Réception des vidéos, extraction de pose, analyse des mouvements et production des résultats. \\
+Frontend & Vue 3, Vite, Pinia, Capacitor & Interface web et mobile pour les profils sportif, coach et administrateur. \\
 \bottomrule
 \end{longtable}
 
+\subsection{Interactions et protocoles}
+
+La \figref{fig:architecture} présente les liaisons entre les composants. Le boîtier communique avec le serveur central par TCP. Le serveur central utilise ensuite des requêtes HTTP internes vers l'API pour enregistrer les mesures et les changements de connexion. Le frontend consomme l'API par HTTP et envoie les vidéos au serveur Python par WebSocket. Tous les services applicatifs partagent la base MongoDB selon leur mode d'accès respectif.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.94\textwidth]{architecture-globale.png}
+  \caption{Architecture logicielle et matérielle globale de TrackrAI}
+  \label{fig:architecture}
+\end{figure}
+
+La séparation entre le serveur central et l'API évite d'exposer directement le boîtier à la logique HTTP de l'application. Elle permet également de maintenir une connexion TCP persistante avec chaque module tout en conservant la logique métier dans l'API.
+
+\subsection{Déroulement d'une séance}
+
+La \figref{fig:sequence-seance} décrit la séquence principale depuis la demande de démarrage jusqu'à l'arrêt d'une séance. L'API crée d'abord un document \code{Session}, puis demande au serveur central d'activer le module choisi. Le serveur central associe alors l'identifiant de séance à la connexion TCP du boîtier. Les mesures reçues sont transmises à l'API uniquement lorsque cet état local est \code{RUNNING}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.93\textwidth]{sequence-seance.png}
+  \caption{Séquence de démarrage, d'acquisition et d'arrêt d'une séance}
+  \label{fig:sequence-seance}
+\end{figure}
+
+À l'arrêt, l'API récupère les mesures liées à la séance, calcule les statistiques, ferme la séance, évalue une éventuelle prévision cardiaque antérieure puis calcule une nouvelle prévision pour une séance comparable. Le contrôle d'état effectué dans le serveur central empêche qu'une mesure reçue hors séance soit persistée par erreur.
+
+\clearpage
+
+\subsection{Flux d'analyse vidéo}
+
+Le flux vidéo est indépendant du flux des capteurs. La \figref{fig:video-pipeline} synthétise le traitement réalisé par le serveur Python.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=1.0cm and 0.7cm,
+  box/.style={draw=trackrblue,rounded corners,align=center,minimum height=1.15cm,text width=2.7cm,fill=blue!4},
+  arrow/.style={-{Latex[length=3mm]},thick,trackrblue}
+]
+\node[box] (front) {Frontend\\sélection de la vidéo};
+\node[box,right=of front] (ws) {WebSocket\\transfert par blocs};
+\node[box,right=of ws] (pose) {MediaPipe\\extraction de pose};
+\node[box,below=of pose] (analyser) {Analyseur métier\\squat / bench / deadlift};
+\node[box,left=of analyser] (result) {Résultat JSON\\répétitions, erreurs, score};
+\node[box,left=of result] (api) {API\\\code{POST /analysis}};
+\draw[arrow] (front) -- (ws);
+\draw[arrow] (ws) -- (pose);
+\draw[arrow] (pose) -- (analyser);
+\draw[arrow] (analyser) -- (result);
+\draw[arrow] (result) -- (api);
+\end{tikzpicture}
+\caption{Pipeline de réception et d'analyse d'une vidéo sportive}
+\label{fig:video-pipeline}
+\end{figure}
+
+La vidéo est stockée temporairement, analysée image par image, puis supprimée. Le résultat est renvoyé au frontend et enregistré dans la collection \code{measures} avec un \code{analysisId}. Le serveur d'analyse conserve aussi une voie historique par la commande TCP \code{STOREANALYSIS}; cette coexistence est documentée comme limite en \secref{sec:limites}.
+
+% =============================================================================
+\clearpage
 \section{Contexte logiciel et matériel}
+% =============================================================================
 
-\subsection{Arborescence des sources}
+\subsection{Organisation et récupération des sources}
 
-Les sources sont versionnées dans le dépôt Git de l'application. Une reprise du projet se fait en clonant ce dépôt, puis en utilisant les fichiers Docker Compose et les guides de lancement fournis à la racine. Les répertoires principaux sont :
+Le code source est hébergé sur le GitLab du département :
 
-\begin{longtable}{p{4cm}p{10cm}}
+\begin{center}
+\url{https://gitlab.iut-bm.univ-fcomte.fr/fbornet/TrackrAI}
+\end{center}
+
+Le dépôt est organisé par composant. Le \tabref{tab:arborescence} permet d'identifier rapidement le répertoire à modifier selon l'évolution recherchée.
+
+\begin{longtable}{L{4.6cm}L{11.4cm}}
+\caption{Organisation des sources de TrackrAI}\label{tab:arborescence}\\
 \toprule
-\textbf{Répertoire} & \textbf{Contenu} \\
+\textbf{Chemin} & \textbf{Contenu et usage} \\
 \midrule
-\texttt{WebTrackr/} & Application frontend Vue 3. Contient les vues, composants, stores Pinia, services HTTP/WebSocket et configuration Vite/Capacitor. \\
-\texttt{TrackrAPI/} & API Node.js/Express. Contient les contrôleurs, routes, modèles Mongoose, scripts IA et configuration de démarrage. \\
-\texttt{CentralServer/} & Serveur Java TCP et client de test. Contient l'interface \texttt{DataDriver}, les implémentations Mongo/HTTP et la logique de gestion des sockets. \\
-\texttt{AnalyzeServer/} & Serveur Python WebSocket d'analyse vidéo. Contient les analyseurs, le stockage temporaire des vidéos et le client TCP vers le serveur central. \\
-\texttt{arduino/} & Firmware ESP32 PlatformIO. Contient le sketch de connexion WiFi, acquisition GPS/IMU/BLE et envoi TCP des mesures. \\
-\texttt{TrackrAIAcceptanceTests/} & Tests d'acceptation automatisés. \\
-\texttt{docs/} & Documentation complémentaire sur l'intégration continue GitLab/Jenkins. \\
-\texttt{DEV.md} & Guide de lancement, tests rapides, comptes de démonstration, reset de base, Swagger et procédure ESP32. \\
+\endfirsthead
+\toprule
+\textbf{Chemin} & \textbf{Contenu et usage} \\
+\midrule
+\endhead
+\code{arduino/} & Projet PlatformIO du boîtier ESP32. Le sketch principal se trouve dans \code{arduino/src/sketch_esp/sketch_esp.ino}. \\
+\code{CentralServer/} & Sources Java du serveur TCP, client de test et bibliothèques MongoDB historiques. \\
+\code{TrackrAPI/} & API Express, modèles Mongoose, contrôleurs, services, calculs de statistiques, configuration Swagger et scripts IA. \\
+\code{AnalyzeServer/} & Serveur WebSocket Python, protocole vidéo, extraction de pose et analyseurs d'exercices. \\
+\code{WebTrackr/} & Frontend Vue, stores Pinia, services HTTP/WebSocket, configuration Vite, Capacitor et projet Android. \\
+\code{TrackrAIAcceptanceTests/} & Tests d'acceptation Maven/Cucumber couvrant l'API, le serveur central et certaines fonctions IA. \\
+\code{docs/} & Documentation complémentaire, notamment la configuration GitLab CI et Jenkins. \\
+\code{docker-compose.dev.yml} & Environnement de développement avec volumes de code et frontend Vite. \\
+\code{docker-compose.yml} & Exécution de production locale avec frontend compilé et servi par Nginx. \\
+\code{docker-compose.ci.yml} & Environnement éphémère utilisé par GitLab CI et Jenkins. \\
 \bottomrule
 \end{longtable}
 
-\subsection{Prérequis de développement}
+La récupération et le lancement de l'environnement de développement s'effectuent avec les commandes suivantes :
 
-\begin{longtable}{p{4cm}p{4cm}p{6cm}}
-\toprule
-\textbf{Outil} & \textbf{Version indicative} & \textbf{Utilisation} \\
-\midrule
-Docker & 24 ou supérieur & Exécution des services en développement et production. \\
-Docker Compose & v2 & Orchestration de MongoDB, API, serveur central, serveur d'analyse et frontend. \\
-Node.js & 20 ou supérieur & Exécution de l'API et du frontend lorsqu'ils ne sont pas conteneurisés. \\
-MongoDB & 6.0 & Base de données principale. \\
-Java & 21 & Compilation et exécution du serveur central. \\
-Python & 3.x & Exécution du serveur d'analyse vidéo et scripts IA. \\
-PlatformIO & Version récente & Compilation et téléversement du firmware ESP32. \\
-\bottomrule
-\end{longtable}
-
-\subsection{Dépendances principales}
-
-\subsubsection{Frontend}
-
-Le frontend utilise Vue 3, Vite, Pinia pour l'état applicatif, Vue Router pour la navigation, Axios pour les appels HTTP, Chart.js pour les graphiques et Leaflet pour les cartes. Capacitor fournit l'enveloppe mobile Android. En développement, l'interface est servie par Vite. En production, le build statique est servi par un conteneur Nginx qui joue également le rôle de reverse proxy vers l'API Node et le serveur WebSocket d'analyse vidéo.
-
-\begin{lstlisting}[style=trackrcode]
-cd WebTrackr
-npm install
-npm run dev
-npm run build
-\end{lstlisting}
-
-\subsubsection{API}
-
-L'API utilise Express, Mongoose, bcryptjs, uuid, validator, dotenv et nodemon en développement. Les scripts IA utilisent Python, pandas, scikit-learn, XGBoost et joblib dans l'image Docker de l'API.
-
-\begin{lstlisting}[style=trackrcode]
-cd TrackrAPI
-npm install
-npm run dev
-\end{lstlisting}
-
-\subsubsection{Analyse vidéo}
-
-Le serveur d'analyse vidéo repose sur les bibliothèques Python suivantes :
-
-\begin{lstlisting}[style=trackrcode]
-opencv-python
-mediapipe==0.10.14
-numpy<2
-websockets==12.0
-\end{lstlisting}
-
-\subsection{Lancement par Docker Compose}
-
-Le lancement recommandé en développement se fait à la racine du dépôt. Cette commande construit les images locales si nécessaire, installe les dépendances dans les conteneurs et démarre l'ensemble des services applicatifs :
-
-\begin{lstlisting}[style=trackrcode]
-docker compose -f docker-compose.dev.yml up --build
-\end{lstlisting}
-
-Les services exposés en développement sont :
-
-\begin{longtable}{p{4cm}p{3cm}p{7cm}}
-\toprule
-\textbf{Service} & \textbf{Port} & \textbf{Rôle} \\
-\midrule
-Frontend Vite & 5173 & Interface web de développement. \\
-API Trackr & 4567 & Routes HTTP sous le préfixe \texttt{/trackrapi}. \\
-Serveur central & 29000 vers 9000 & Point d'entrée TCP pour les modules ESP32. \\
-Serveur analyse & 6000 & WebSocket pour l'upload et l'analyse vidéo. \\
-MongoDB & 27017 & Base de données accessible localement. \\
-\bottomrule
-\end{longtable}
-
-Pour un lancement de production local, le fichier \texttt{docker-compose.yml} construit le frontend puis le sert avec Nginx. L'API, le serveur central, le serveur d'analyse et MongoDB restent isolés dans le réseau Docker :
-
-\begin{lstlisting}[style=trackrcode]
-docker compose -f docker-compose.yml up --build -d
-\end{lstlisting}
-
-L'arrêt de la pile de production locale se fait par :
-
-\begin{lstlisting}[style=trackrcode]
-docker compose -f docker-compose.yml down
-\end{lstlisting}
-
-Les variables d'environnement principales sont :
-
-\begin{longtable}{p{5cm}p{9cm}}
-\toprule
-\textbf{Variable} & \textbf{Description} \\
-\midrule
-\texttt{MONGODB\_URL} & URL de connexion MongoDB. \\
-\texttt{PORT} & Port HTTP de l'API. \\
-\texttt{CENTRAL\_HOST}, \texttt{CENTRAL\_PORT} & Adresse du serveur central depuis les services internes. \\
-\texttt{SERVICE\_SECRET} & Secret partagé utilisé par les appels internes Java/API. \\
-\texttt{JWT\_SECRET} & Secret utilisé par l'API pour signer et vérifier les access tokens JWT. \\
-\texttt{USER\_ACCESS\_TOKEN\_TTL\_MINUTES} & Durée de validité de l'access token utilisateur. \\
-\texttt{USER\_REFRESH\_TOKEN\_TTL\_DAYS} & Durée de validité du refresh token utilisateur. \\
-\texttt{WS\_HOST}, \texttt{WS\_PORT} & Adresse d'écoute du serveur WebSocket d'analyse vidéo. \\
-\texttt{MAX\_VIDEO\_BYTES} & Taille maximale d'une vidéo reçue par le serveur d'analyse. \\
-\bottomrule
-\end{longtable}
-
-\section{Descriptif technique}
-
-\subsection{Frontend Vue / Capacitor}
-
-\subsubsection{Organisation}
-
-Le répertoire \texttt{WebTrackr/src} contient les vues, composants, services et stores. Les services isolent les communications HTTP et WebSocket. Les stores Pinia conservent l'état de session utilisateur, les droits, l'identité du sportif et les données nécessaires aux pages.
-
-\begin{longtable}{p{5cm}p{9cm}}
-\toprule
-\textbf{Élément} & \textbf{Rôle} \\
-\midrule
-\texttt{views/} & Pages principales : tableau de bord sportif, historique, détail séance avec mode direct, comparaison de séances, administration, coach, analyse vidéo avec historique intégré. \\
-\texttt{components/} & Composants réutilisables : navigation, graphiques, cartes statistiques. \\
-\texttt{services/api.service.js} & Client Axios, ajout du JWT dans \texttt{Authorization: Bearer}, compatibilité \texttt{x-session-id}, refresh automatique sur réponse 401. \\
-\texttt{services/auth.service.js} & Connexion, déconnexion, refresh token et vérification de session. \\
-\texttt{services/analysis.ws.js} & Connexion WebSocket au serveur d'analyse vidéo. \\
-\texttt{store/auth.store.js} & Stockage de l'identité utilisateur, des droits, de l'access token et du refresh token. \\
-\texttt{router/index.js} & Routes frontend et gardes de navigation par rôle. \\
-\bottomrule
-\end{longtable}
-
-\subsubsection{Gestion des rôles côté interface}
-
-Trois profils sont représentés :
-
-\begin{itemize}
-  \item \textbf{sportif} : consultation du tableau de bord, lancement de séance, historique, comparaison de deux séances, analyse vidéo ;
-  \item \textbf{coach} : consultation des sportifs suivis, accès au live d'une séance active, comparaison de séances, accès aux analyses du périmètre affecté ;
-  \item \textbf{administrateur} : gestion des utilisateurs, modules et affectations coach/sportif.
-\end{itemize}
-
-Les gardes Vue Router empêchent l'accès aux pages non compatibles avec le rôle local. La sécurité effective reste appliquée côté API.
-
-\subsubsection{Gestion des tokens}
-
-Le frontend conserve deux jetons :
-
-\begin{itemize}
-  \item un access token JWT court, signé par l'API et envoyé en priorité dans l'en-tête \texttt{Authorization: Bearer} ;
-  \item une copie de compatibilité envoyée dans \texttt{x-session-id} ;
-  \item un refresh token long, opaque, utilisé uniquement sur \texttt{POST /auth/refresh}.
-\end{itemize}
-
-Lorsqu'une requête API renvoie \texttt{401}, le client Axios tente un refresh. Si le refresh réussit, l'access token est remplacé et la requête initiale est rejouée. Si le refresh échoue, les données locales d'authentification sont supprimées et l'utilisateur est redirigé vers la page de connexion.
-
-\subsection{API Node.js / Express}
-
-\subsubsection{Organisation}
-
-L'API est organisée selon une structure classique routes/contrôleurs/modèles :
-
-\begin{longtable}{p{5cm}p{9cm}}
-\toprule
-\textbf{Répertoire} & \textbf{Rôle} \\
-\midrule
-\texttt{routes/} & Déclaration des routes HTTP sous le préfixe \texttt{/trackrapi}. \\
-\texttt{controllers/} & Logique métier : authentification, utilisateurs, modules, mesures, séances, IA. \\
-\texttt{models/} & Modèles Mongoose correspondant aux collections MongoDB. \\
-\texttt{utils/} & Calculs statistiques : distance GPS, pas, stress, score de performance. \\
-\texttt{ai/} & Scripts Python d'entraînement et de prédiction. \\
-\texttt{services/} & Appels TCP vers le serveur central, exécution des scripts IA, surveillance de sessions. \\
-\bottomrule
-\end{longtable}
-
-\subsubsection{Format de réponse}
-
-Les réponses API suivent le format :
-
-\begin{lstlisting}[style=trackrcode]
-{
-  "error": 0,
-  "status": 200,
-  "data": { ... }
-}
-\end{lstlisting}
-
-Une valeur \texttt{error} différente de zéro indique une erreur applicative. Le champ \texttt{status} reprend le statut HTTP attendu et \texttt{data} contient les données ou le message d'erreur.
-
-\subsubsection{Authentification et sécurité}
-
-L'authentification repose sur un couple access token JWT / refresh token :
-
-\begin{itemize}
-  \item \texttt{POST /auth/signin} vérifie le mot de passe avec bcrypt ;
-  \item l'API crée un identifiant de session \texttt{jti}, stocké en base dans le champ \texttt{sessionId} ;
-  \item l'access token est un JWT signé avec \texttt{JWT\_SECRET}. Il contient notamment \texttt{sub}, \texttt{login}, \texttt{rights}, \texttt{jti} et \texttt{exp} ;
-  \item \texttt{verifyToken} vérifie la signature JWT puis contrôle que le couple \texttt{sub}/\texttt{jti} existe toujours en base ;
-  \item le refresh token reste opaque et stocké en base dans le champ \texttt{refreshToken} ;
-  \item \texttt{POST /auth/refresh} renouvelle le JWT, le \texttt{jti} et le refresh token, ce qui invalide les anciens jetons ;
-  \item \texttt{POST /auth/logout} supprime le \texttt{jti} et le refresh token côté serveur.
-\end{itemize}
-
-Les routes internes appelées par le serveur central sont protégées par l'en-tête \texttt{x-service-secret}. Cette protection évite qu'une écriture de mesure ou un auto-enregistrement de module soit accepté depuis un client HTTP externe non autorisé.
-
-\subsubsection{Routes principales}
-
-\begin{longtable}{p{2cm}p{4.8cm}p{3cm}p{5cm}}
-\toprule
-\textbf{Méthode} & \textbf{Chemin} & \textbf{Protection} & \textbf{Rôle} \\
-\midrule
-GET & \texttt{/health} & publique & Vérification de disponibilité de l'API. \\
-POST & \texttt{/auth/signin} & publique & Connexion utilisateur. \\
-POST & \texttt{/auth/refresh} & refresh token & Renouvellement des jetons. \\
-POST & \texttt{/auth/logout} & access token & Déconnexion serveur. \\
-GET & \texttt{/auth/me} & access token & Lecture de la session courante. \\
-POST & \texttt{/measure/create} & service secret & Création de mesure depuis le serveur central. \\
-PATCH & \texttt{/measure/update} & admin & Mise à jour d'une mesure. \\
-GET & \texttt{/measure/get} & access token & Lecture filtrée des mesures. \\
-POST & \texttt{/module/register} & service secret & Auto-enregistrement d'un module matériel. \\
-POST & \texttt{/module/connection} & service secret & Mise à jour de l'état de connexion module. \\
-POST & \texttt{/module/create} & admin & Création administrative d'un module. \\
-PATCH & \texttt{/module/update} & admin & Modification administrative d'un module. \\
-GET & \texttt{/module/get} & access token & Liste des modules. \\
-POST & \texttt{/user/create} & admin & Création utilisateur. \\
-PATCH & \texttt{/user/update} & admin & Modification utilisateur et affectation coach. \\
-GET & \texttt{/user/getusers} & admin/coach & Liste des utilisateurs selon périmètre. \\
-POST & \texttt{/session/start} & access token & Démarrage d'une séance. \\
-POST & \texttt{/session/stop} & access token & Arrêt d'une séance et calcul des statistiques. \\
-POST & \texttt{/session/active} & service secret & Vérification interne d'une session active. \\
-POST & \texttt{/session/active-for-module} & access token & Vérification frontend d'un module actif. \\
-GET & \texttt{/session/history} & access token & Historique filtré par rôle. \\
-GET & \texttt{/analysis} & access token & Historique filtré des analyses vidéo. \\
-GET & \texttt{/analysis/:analysisId} & access token & Détail d'une analyse vidéo. \\
-POST & \texttt{/ai/train} & admin & Ré-entraînement du modèle IA. \\
-GET & \texttt{/ai/predict/:sessionId} & access token & Prédiction IA pour une séance accessible. \\
-GET & \texttt{/ai/insights/:sessionId} & access token & Explications IA d'une séance accessible. \\
-\bottomrule
-\end{longtable}
-
-\subsubsection{Documentation OpenAPI / Swagger}
-
-Une documentation Swagger est servie directement par l'API via \texttt{/trackrapi/api-docs}, à partir d'une configuration \texttt{swagger-jsdoc} située dans \texttt{TrackrAPI/config/swaggerConfig.js}. Elle permet de tester les routes publiques, les routes protégées par \texttt{Authorization: Bearer <JWT>}, le renouvellement par refresh token et les routes internes protégées par \texttt{x-service-secret}. Cette documentation sert également de support technique pour expliciter les contrats HTTP du POC.
-\subsection{Base de données MongoDB}
-
-\subsubsection{Collections}
-
-\begin{longtable}{p{3.2cm}p{10.8cm}}
-\toprule
-\textbf{Collection} & \textbf{Description} \\
-\midrule
-\texttt{users} & Utilisateurs de l'application. Contient login, mot de passe hashé, email, droits, coach référent, access token, refresh token et dates d'expiration. \\
-\texttt{modules} & Modules matériels enregistrés. Contient nom, surnom, clé unique, type de microcontrôleur, chipsets, état connecté et date de dernière activité. \\
-\texttt{chipsets} & Déclaration des capteurs ou composants associés aux modules. \\
-\texttt{sessions} & Séances sportives. Lie un utilisateur, un module, les dates de début/fin, la dernière mesure reçue et les statistiques calculées. \\
-\texttt{measures} & Mesures unitaires. Contient type, date, valeur textuelle, module, séance et éventuellement identifiant d'analyse vidéo. \\
-\bottomrule
-\end{longtable}
-
-\subsubsection{Structure des documents}
-
-Les modèles Mongoose du répertoire \texttt{TrackrAPI/models} décrivent les documents stockés. Les champs principaux sont :
-
-\begin{longtable}{p{3.2cm}p{10.8cm}}
-\toprule
-\textbf{Collection} & \textbf{Champs principaux} \\
-\midrule
-\texttt{users} & \texttt{login}, \texttt{password} hashé, \texttt{email}, \texttt{rights}, \texttt{coach}, \texttt{sessionId}, \texttt{sessionExpiresAt}, \texttt{refreshToken}, \texttt{refreshExpiresAt}. Le champ \texttt{coach} référence un utilisateur possédant le rôle coach. \\
-\texttt{modules} & \texttt{name}, \texttt{shortName}, \texttt{key}, \texttt{uc}, \texttt{chipsets}, \texttt{connected}, \texttt{lastSeen}. La clé \texttt{key} identifie le module côté TCP. \\
-\texttt{chipsets} & \texttt{name}, \texttt{description}, \texttt{links}, \texttt{caps}. Les capacités décrivent les types de mesures ou fonctions disponibles. \\
-\texttt{sessions} & \texttt{sessionId}, \texttt{user}, \texttt{module}, \texttt{startDate}, \texttt{lastMeasureAt}, \texttt{lastHeartRateAt}, \texttt{endDate}, \texttt{stats}. Les statistiques agrégées sont stockées dans \texttt{stats}. \\
-\texttt{measures} & \texttt{type}, \texttt{date}, \texttt{value}, \texttt{module}, \texttt{session}, \texttt{analysisId}. La valeur reste une chaîne afin d'accepter des mesures hétérogènes. \\
-\bottomrule
-\end{longtable}
-
-\subsubsection{Relations}
-
-\begin{itemize}
-  \item Une séance référence un utilisateur et un module.
-  \item Une mesure référence une séance et éventuellement un module.
-  \item Un module référence plusieurs chipsets.
-  \item Un sportif référence au plus un coach.
-  \item Un coach peut être référencé par plusieurs sportifs.
-\end{itemize}
-
-\subsection{Serveur central Java}
-
-\subsubsection{Rôle}
-
-Le serveur central Java est le point d'entrée des modules matériels. Il écoute des connexions TCP persistantes, gère l'identification des modules et transmet les mesures vers l'API. Il permet également à l'API de demander le démarrage ou l'arrêt d'une séance sur un module connecté.
-
-\subsubsection{Organisation}
-
-\begin{longtable}{p{5cm}p{9cm}}
-\toprule
-\textbf{Fichier} & \textbf{Rôle} \\
-\midrule
-\texttt{DataDriver.java} & Interface décrivant les opérations de stockage, enregistrement module, état session et connexion. \\
-\texttt{HttpDataDriver.java} & Implémentation qui transmet les opérations à l'API HTTP. Ajoute le secret de service dans l'en-tête \texttt{x-service-secret}. \\
-\texttt{MongoDataDriver.java} & Implémentation historique d'accès direct à MongoDB. \\
-\texttt{ThreadServer.java} & Gestion d'une connexion TCP module, parsing des commandes et état local de session. \\
-\texttt{MainServer.java} & Démarrage du serveur TCP. \\
-\bottomrule
-\end{longtable}
-
-\subsubsection{Protocole TCP}
-
-Les commandes principales sont :
-
-\begin{longtable}{p{4cm}p{10cm}}
-\toprule
-\textbf{Commande} & \textbf{Description} \\
-\midrule
-\texttt{AUTOREGISTER uc chipsets...} & Demande d'enregistrement automatique d'un module. \\
-\texttt{HELLO moduleKey} & Identification d'un module déjà enregistré. \\
-\texttt{STOREMEASURE type date value moduleKey} & Envoi d'une mesure pendant une séance active. \\
-\texttt{STOREANALYSIS type date value} & Envoi d'un résultat d'analyse vidéo sérialisé. \\
-\texttt{START\_SESSION sessionId} & Commande envoyée au module pour démarrer l'acquisition. \\
-\texttt{STOP\_SESSION} & Commande envoyée au module pour arrêter l'acquisition. \\
-\bottomrule
-\end{longtable}
-
-\subsection{Module ESP32}
-
-\subsubsection{Matériel}
-
-Le module matériel est construit autour d'un ESP32. Il utilise :
-
-\begin{itemize}
-  \item un GPS connecté sur l'UART matériel 2, avec réception sur la broche GPIO 27 ;
-  \item un MPU6050 connecté en I2C, avec SDA sur GPIO 19 et SCL sur GPIO 22 ;
-  \item une ceinture cardiaque Bluetooth Low Energy exposant le service Heart Rate \texttt{180D} et la caractéristique \texttt{2A37} ;
-  \item le bouton BOOT de l'ESP32 pour une réinitialisation de configuration après maintien prolongé.
-\end{itemize}
-
-\subsubsection{Bibliothèques embarquées}
-
-Le firmware PlatformIO utilise notamment :
-
-\begin{itemize}
-  \item \texttt{WiFiManager} pour la configuration WiFi et l'adresse du serveur ;
-  \item \texttt{MPU6050} pour l'accéléromètre et le gyroscope ;
-  \item \texttt{NeoGPS} pour la lecture GPS ;
-  \item les bibliothèques BLE de l'ESP32 pour la ceinture cardiaque ;
-  \item \texttt{Preferences} pour stocker l'adresse serveur et la clé module en mémoire flash.
-\end{itemize}
-
-\subsubsection{Fonctionnement}
-
-Au démarrage, le module charge la configuration stockée. Si aucune configuration WiFi ou serveur n'existe, un point d'accès \texttt{Trackr-ESP32} est ouvert par WiFiManager afin de saisir l'adresse et le port du serveur central. La clé du module est conservée en mémoire flash après auto-enregistrement.
-
-Une fois connecté au serveur central, le module envoie \texttt{AUTOREGISTER} si nécessaire, puis \texttt{HELLO}. Les mesures ne sont envoyées que lorsque le serveur central transmet une commande de démarrage de séance. Les données GPS sont filtrées côté module avec une distance minimale, une vitesse minimale et un intervalle minimal entre deux positions. Le MPU6050 est d'abord stabilisé, puis l'ESP32 échantillonne l'accélération localement afin de détecter les pics de marche/course et maintenir un compteur cumulatif de pas. Ce compteur est transmis comme mesure dédiée \texttt{steps}. Les axes d'accélération et de gyroscope restent envoyés environ une fois par seconde pour le suivi brut et les diagnostics.
-
-\subsection{Calcul des statistiques de séance}
-
-Les statistiques de séance sont calculées à l'arrêt de la séance à partir des mesures enregistrées. Les fonctions principales sont dans \texttt{TrackrAPI/utils}.
-
-\begin{longtable}{p{4cm}p{10cm}}
-\toprule
-\textbf{Fichier} & \textbf{Rôle} \\
-\midrule
-\texttt{geo.js} & Calcul de distance par Haversine, filtrage des points GPS aberrants et indicateur de qualité GPS. \\
-\texttt{physio.js} & Calcul de stress et estimation de secours des pas si aucune mesure embarquée \texttt{steps} n'est disponible. \\
-\texttt{sessionStats.js} & Agrégation globale d'une séance : distance, vitesse, fréquence cardiaque, dernière valeur \texttt{steps}, stress, score et qualité GPS. \\
-\texttt{performanceScore.js} & Calcul du score de performance de référence. \\
-\bottomrule
-\end{longtable}
-
-La distance et la trace GPS restent dépendantes du matériel, de l'environnement et du placement du module. Le comptage de pas est désormais effectué côté ESP32 comme compteur cumulatif basé sur l'accéléromètre, puis stocké sous forme de mesure \texttt{steps}. Lorsque cette mesure existe, les vues utilisent la dernière valeur transmise par l'ESP32 ; l'estimation logicielle depuis les axes \texttt{acc\_x}, \texttt{acc\_y} et \texttt{acc\_z} n'est conservée qu'en solution de secours.
-
-\subsection{Serveur d'analyse vidéo Python}
-
-\subsubsection{Flux d'analyse}
-
-Le serveur d'analyse reçoit la vidéo par WebSocket. Le protocole est constitué de trois messages principaux :
-
-\begin{enumerate}
-  \item \texttt{START\_ANALYSIS} : initialise l'analyse, précise l'exercice et l'utilisateur ;
-  \item \texttt{VIDEO\_CHUNK} : transmet la vidéo encodée en base64 ;
-  \item \texttt{END\_ANALYSIS} : finalise le fichier temporaire et lance l'analyse.
-\end{enumerate}
-
-Après analyse, le résultat est renvoyé au client. Le frontend le sauvegarde ensuite via une route API authentifiée afin d'alimenter immédiatement l'historique visible par l'utilisateur. Le serveur d'analyse conserve également le chemin historique de transmission vers le serveur central avec \texttt{STOREANALYSIS}, ce qui permet de rester compatible avec l'architecture initiale.
-
-\subsubsection{Organisation}
-
-\begin{longtable}{p{5cm}p{9cm}}
-\toprule
-\textbf{Fichier} & \textbf{Rôle} \\
-\midrule
-\texttt{ws\_server.py} & Serveur WebSocket, réception des messages, orchestration de l'analyse. \\
-\texttt{pose\_extractor.py} & Extraction des landmarks MediaPipe sur les frames échantillonnées. \\
-\texttt{metrics.py} & Fonctions géométriques : conversion en coordonnées, calcul d'angle, lissage. \\
-\texttt{analyzer\_registry.py} & Sélection de l'analyseur selon l'exercice demandé. \\
-\texttt{squat\_analyzer.py} & Analyse principale du squat. \\
-\texttt{bench\_analyzer.py} & Analyse expérimentale du développé couché. \\
-\texttt{deadlift\_analyzer.py} & Analyse expérimentale du soulevé de terre. \\
-\texttt{central\_tcp\_client.py} & Envoi du résultat d'analyse au serveur central. \\
-\bottomrule
-\end{longtable}
-
-\subsubsection{Métriques vidéo}
-
-Le squat est évalué à partir des angles des genoux, de l'inclinaison du buste et de la différence gauche/droite. Les répétitions sont détectées par transition entre une position haute et une position basse. Le développé couché expérimental s'appuie sur les angles des coudes. Le soulevé de terre expérimental s'appuie sur l'extension de hanche.
-
-Les modes expérimentaux dépendent fortement de l'angle de caméra, de la stabilité de l'image et de la visibilité des articulations. Ils constituent une extension fonctionnelle du système, mais nécessitent une validation sur davantage de vidéos avant un usage fiable.
-
-\subsection{Intelligence artificielle}
-
-\subsubsection{Objectif}
-
-Le module IA ne produit plus un score abstrait sur 100. Il prévoit une grandeur directement observable : la fréquence cardiaque moyenne, en battements par minute, de la prochaine séance de charge comparable. Cette prévision peut être confrontée à la fréquence cardiaque réellement mesurée lorsque cette séance est réalisée. L'application conserve alors la valeur prévue, la valeur observée et l'erreur absolue en bpm. Le modèle devient ainsi évaluable et peut progressivement intégrer de nouvelles paires issues du sportif.
-
-La prévision alimente une aide à la décision prudente. Une hausse légère de charge n'est proposée que si les indicateurs de récupération sont favorables et si le modèle bat une baseline simple sur le jeu de validation. Dans le cas contraire, l'interface indique explicitement que la prévision reste informative. Il ne s'agit ni d'un avis médical ni d'un générateur autonome de programmes.
-
-\subsubsection{Modèle et cible}
-
-Le modèle utilisé est \texttt{XGBRegressor}. Ce choix convient aux données tabulaires numériques et permet une inférence rapide. Les caractéristiques sont :
-
-\begin{itemize}
-  \item \texttt{distanceKm} et \texttt{durationMin} ;
-  \item \texttt{hrAvg} et \texttt{hrMax} ;
-  \item \texttt{stress} ;
-  \item \texttt{steps} et \texttt{paceStepsPerMin} ;
-  \item les écarts de distance, pas, stress et fréquence cardiaque par rapport à l'historique ;
-  \item le nombre de séances antérieures et le délai depuis la séance précédente.
-\end{itemize}
-
-La cible \texttt{next\_comparable\_session\_hr\_avg} est la fréquence cardiaque moyenne effectivement observée lors de la prochaine séance comparable. Pour les données TrackrAI, deux séances sont comparables si elles durent au moins cinq minutes, contiennent un cardio valide, disposent d'une charge mesurable par distance ou pas, et présentent des rapports de durée et de charge raisonnables. Aucune pondération métier ne fabrique la cible.
-
-\subsubsection{Données externes et entraînement}
-
-Le script \texttt{prepare\_pamap2.py} télécharge l'archive officielle PAMAP2 de l'UCI, y compris son archive ZIP imbriquée, puis lit les fichiers Protocol des neuf sujets. Les signaux cardiaques et inertiels sont agrégés en fenêtres consécutives de 60 secondes appartenant à la même activité. Pour chaque paire, \texttt{nextHrAvg} contient la fréquence cardiaque réellement mesurée dans la fenêtre suivante.
-
-Le fichier généré contient 194 paires brutes. Après exclusion des activités sans charge locomotrice exploitable, le dernier entraînement utilise 81 paires PAMAP2 et 24 paires TrackrAI, soit 105 observations réelles. La séparation entraînement/validation est effectuée par sujet avant l'augmentation synthétique. Le bruit faible n'est appliqué qu'au sous-ensemble d'entraînement : aucune copie d'une observation de validation ne peut donc se retrouver dans l'entraînement.
-
-\begin{lstlisting}[style=trackrcode]
-target: next_comparable_session_hr_avg
-rawSamples: 105
-localSamples: 24
-externalSamples: 81
-validationSamples: 22
-maeBpm: 6.172
-rmseBpm: 7.907
-r2: 0.793
-baselineMaeBpm: 5.434
-beatsBaseline: false
-\end{lstlisting}
-
-La baseline prévoit simplement que la prochaine fréquence cardiaque moyenne sera identique à l'actuelle. Sur la séparation actuelle, sa MAE de 5,434 bpm reste meilleure que celle de XGBoost, égale à 6,172 bpm. Ce résultat est conservé et affiché honnêtement : le modèle n'est pas encore autorisé à piloter automatiquement une augmentation de charge. Le pipeline est néanmoins fonctionnel, reproductible et mesurable ; de nouvelles séances réelles permettront de vérifier si la personnalisation locale améliore progressivement ce résultat.
-
-\subsubsection{Prédiction et vérification}
-
-Le script \texttt{predict\_session.py} refuse les séances de moins de cinq minutes, sans fréquence cardiaque ou sans distance ni pas exploitables. Pour une séance éligible, il renvoie :
-
-\begin{itemize}
-  \item la fréquence cardiaque moyenne prévue en bpm ;
-  \item l'écart prévu par rapport à la séance actuelle ;
-  \item une plage indicative construite à partir de la MAE de validation ;
-  \item les caractéristiques utilisées et les métriques du modèle.
-\end{itemize}
-
-Lorsqu'une séance comparable suivante se termine, l'API rattache sa fréquence cardiaque observée à la prévision précédente et calcule l'erreur absolue. L'endpoint \texttt{/ai/insights/:sessionId} expose ces informations au sportif, à son coach affecté et à l'administrateur. Les objectifs de durée, distance ou pas restent issus de règles prudentes et transparentes ; ils ne sont augmentés que si la validation du modèle et les indicateurs physiologiques le permettent.
-
-\section{Sécurité applicative}
-
-\subsection{Contrôle d'accès}
-
-Les accès sont filtrés à deux niveaux. Le frontend masque les pages non compatibles avec le rôle utilisateur, puis l'API vérifie systématiquement les droits avant d'accéder aux données sensibles.
-
-Les règles principales sont :
-
-\begin{itemize}
-  \item un sportif consulte uniquement ses propres séances, mesures et analyses ;
-  \item un coach consulte les données des sportifs qui lui sont affectés ;
-  \item un administrateur consulte et modifie l'ensemble des utilisateurs et modules ;
-  \item les routes de création de mesures et d'enregistrement module exigent un secret de service ;
-  \item l'entraînement IA est réservé à l'administrateur.
-\end{itemize}
-
-\subsection{Gestion access token / refresh token}
-
-Le système d'authentification utilise deux jetons. L'access token est un JWT court, signé côté API et transmis dans les requêtes courantes via \texttt{Authorization: Bearer}. Le champ \texttt{jti} du JWT est stocké côté serveur afin de permettre la révocation lors d'un logout ou d'un refresh. Le refresh token est opaque, plus long, stocké en base et permet d'obtenir un nouveau JWT sans nouvelle saisie du mot de passe. Lors d'un refresh, le refresh token et le \texttt{jti} sont également renouvelés, ce qui invalide les anciens jetons.
-
-En environnement de démonstration, les durées sont :
-
-\begin{itemize}
-  \item access token : 15 minutes ;
-  \item refresh token : 7 jours.
-\end{itemize}
-
-\section{Procédures d'exploitation}
-
-\subsection{Installation et lancement}
-
-La procédure recommandée est :
-
-\begin{lstlisting}[style=trackrcode]
-git clone <depot-trackrai>
+\begin{lstlisting}[language=bash]
+git clone https://gitlab.iut-bm.univ-fcomte.fr/fbornet/TrackrAI.git
 cd TrackrAI
 docker compose -f docker-compose.dev.yml up --build
 \end{lstlisting}
 
-Le frontend est disponible sur \url{http://localhost:5173}. L'API est disponible sur \url{http://localhost:4567/trackrapi}. Le serveur central TCP est exposé sur le port \texttt{29000}.
+L'accès au dépôt nécessite un compte autorisé sur le GitLab de l'IUT.
 
-\subsection{Arrêt}
+\subsection{Outils de développement et versions}
 
-\begin{lstlisting}[style=trackrcode]
+Le \tabref{tab:outils} regroupe les outils nécessaires pour reproduire l'environnement. Les versions des bibliothèques applicatives détaillées sont regroupées en \annref{ann:dependances}.
+
+\begin{longtable}{L{3.7cm}L{2.8cm}L{5.2cm}L{4.3cm}}
+\caption{Outils nécessaires au développement et à l'exécution}\label{tab:outils}\\
+\toprule
+\textbf{Outil} & \textbf{Version} & \textbf{Usage dans TrackrAI} & \textbf{Installation / source} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Outil} & \textbf{Version} & \textbf{Usage dans TrackrAI} & \textbf{Installation / source} \\
+\midrule
+\endhead
+Git & version récente & Récupération et versionnement des sources. & \url{https://git-scm.com/} \\
+Docker Engine & 24 ou supérieur & Construction et exécution des services. & \url{https://docs.docker.com/engine/install/} \\
+Docker Compose & v2 & Orchestration des conteneurs. & Fourni avec Docker Desktop ou plugin Compose. \\
+Node.js & 20 & API et build du frontend. & \url{https://nodejs.org/} \\
+Java JDK & 21 & Compilation et exécution du serveur central. & Eclipse Temurin 21 ou JDK compatible. \\
+Python & 3.10 pour l'analyse & Analyse vidéo; un environnement Python est aussi embarqué dans l'image API pour l'entraînement et l'inférence XGBoost de la prévision cardiaque. & \url{https://www.python.org/} \\
+MongoDB & 6.0 & Base de données principale. & Image Docker \code{mongo:6.0}. \\
+PlatformIO & version compatible ESP32 & Compilation et téléversement du firmware. & Extension VS Code ou CLI PlatformIO. \\
+Maven & 3.x & Exécution des tests d'acceptation. & \url{https://maven.apache.org/} \\
+Android Studio & version compatible Capacitor & Construction et débogage de l'application Android. & \url{https://developer.android.com/studio} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Configuration des variables d'environnement}
+
+Les fichiers \code{.env.example} documentent les paramètres attendus. Les valeurs de démonstration présentes dans les fichiers Compose ne doivent pas être réutilisées telles quelles dans un environnement public. Les variables principales sont présentées dans le \tabref{tab:variables-env}; la liste complète figure en \annref{ann:env}.
+
+\begin{longtable}{L{5.5cm}L{10.5cm}}
+\caption{Variables d'environnement principales}\label{tab:variables-env}\\
+\toprule
+\textbf{Variable} & \textbf{Fonction} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Variable} & \textbf{Fonction} \\
+\midrule
+\endhead
+\code{MONGODB_URL} & Chaîne de connexion MongoDB utilisée par l'API. \\
+\code{PORT} & Port HTTP de l'API, égal à 4567 dans les fichiers Compose. \\
+\code{CENTRAL_HOST}, \code{CENTRAL_PORT} & Adresse du serveur central depuis l'API et le serveur d'analyse. \\
+\code{SERVICE_SECRET} & Secret partagé entre le serveur central et les routes internes de l'API. \\
+\code{JWT_SECRET} & Clé de signature des access tokens JWT. \\
+\code{USER_ACCESS_TOKEN_TTL_MINUTES} & Durée de validité d'un access token. \\
+\code{USER_REFRESH_TOKEN_TTL_DAYS} & Durée de validité d'un refresh token. \\
+\code{WS_HOST}, \code{WS_PORT} & Adresse d'écoute du serveur WebSocket d'analyse. \\
+\code{SESSION_MAX_IDLE_MS} & Délai maximal sans mesure avant fermeture automatique d'une séance. \\
+\code{SESSION_MAX_HEART_RATE_IDLE_MS} & Délai maximal sans fréquence cardiaque positive après la période initiale. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Compilation, conteneurisation et exécution}
+
+\subsubsection{Développement avec Docker Compose}
+
+La commande suivante construit les images locales et démarre l'ensemble de la pile de développement :
+
+\begin{lstlisting}[language=bash]
+docker compose -f docker-compose.dev.yml up --build
+\end{lstlisting}
+
+Les services exposés sont :
+
+\begin{longtable}{L{4.4cm}L{3.0cm}L{8.6cm}}
+\caption{Ports exposés en développement}\label{tab:ports-dev}\\
+\toprule
+\textbf{Service} & \textbf{Port hôte} & \textbf{Accès} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Service} & \textbf{Port hôte} & \textbf{Accès} \\
+\midrule
+\endhead
+Frontend Vite & 5173 & \url{http://localhost:5173} \\
+API Express & 4567 & \url{http://localhost:4567/trackrapi} \\
+Swagger & 4567 & \url{http://localhost:4567/trackrapi/api-docs} \\
+Serveur central TCP & 29000 & Port utilisé par le boîtier ESP32. \\
+Serveur d'analyse & 6000 & \code{ws://localhost:6000} \\
+MongoDB & 27017 & Accès local aux données de développement. \\
+\bottomrule
+\end{longtable}
+
+L'arrêt conserve les données MongoDB :
+
+\begin{lstlisting}[language=bash]
 docker compose -f docker-compose.dev.yml down
 \end{lstlisting}
 
-La suppression du volume MongoDB, utile pour repartir d'une base vide, se fait avec :
+La commande suivante supprime également le volume de la base :
 
-\begin{lstlisting}[style=trackrcode]
+\begin{lstlisting}[language=bash]
 docker compose -f docker-compose.dev.yml down -v
 \end{lstlisting}
 
-\subsection{Données de démonstration}
+\subsubsection{Exécution de production locale}
 
-La base initialisée par l'API contient plusieurs comptes de test permettant de présenter les rôles sans manipulation manuelle préalable. Pour la démonstration finale, le compte \texttt{floryan/floryan} est un coach et le compte \texttt{corentin/corentin} est un sportif affecté à ce coach. Des séances historiques sont générées pour Corentin afin de montrer l'historique, le tableau de bord coach et la comparaison entre séances. Les comptes \texttt{admin/admin}, \texttt{coach/coach}, \texttt{test/azer}, \texttt{thomas/thomas} et \texttt{lea/lea} restent également disponibles.
+Le fichier \code{docker-compose.yml} compile le frontend avec Node.js puis le sert avec Nginx. Il ne constitue pas à lui seul une procédure de déploiement sur un serveur distant, mais reproduit une configuration d'exécution proche de la production :
 
-\subsection{Intégration continue GitLab / Jenkins}
-
-Le versioning est réalisé sur le serveur GitLab du département. L'intégration continue est prévue sur Jenkins à partir du \texttt{Jenkinsfile} présent à la racine du dépôt. Le dépôt contient également un fichier \texttt{.gitlab-ci.yml}, utile si un runner GitLab Docker est disponible. Les pipelines s'appuient sur \texttt{docker-compose.ci.yml} afin de valider la configuration Docker, construire les images applicatives et lancer les vérifications automatisées dans un environnement reproductible. La documentation complémentaire est conservée dans \texttt{docs/CI\_GITLAB\_JENKINS.md}. Dans un déploiement réel, les secrets utilisés par la CI doivent être déplacés dans les variables protégées GitLab ou Jenkins.
-
-\subsection{Tests}
-
-Les tests manuels prioritaires sont :
-
-\begin{enumerate}
-  \item connexion administrateur et affectation d'un coach à un sportif ;
-  \item connexion coach et vérification du filtre \og mes sportifs \fg{}, de l'accès live à une séance active et de la comparaison de séances ;
-  \item connexion sportif et vérification du coach référent ;
-  \item démarrage et arrêt d'une séance avec un module ESP32 ;
-  \item upload d'une vidéo, consultation du résultat et de l'historique intégré sur la même page ;
-  \item vérification de la trace GPS et du compteur de pas \texttt{steps} envoyé par l'ESP32 sur une nouvelle séance.
-\end{enumerate}
-
-Les tests d'acceptation peuvent être lancés par :
-
-\begin{lstlisting}[style=trackrcode]
-cd TrackrAIAcceptanceTests
-mvn test
+\begin{lstlisting}[language=bash]
+docker compose -f docker-compose.yml up --build -d
 \end{lstlisting}
 
-\section{Limites et perspectives}
+Le frontend est alors accessible sur \url{http://localhost:8080}. L'API reste exposée sur le port 4567, le serveur central sur 29000 et le serveur d'analyse sur 6000.
 
-\subsection{Capteurs}
+\subsubsection{Exécution sans Docker}
 
-Le GPS reste sensible à l'environnement, en particulier en intérieur ou au démarrage du fix. Le comptage de pas repose uniquement sur l'accéléromètre du MPU6050 et dépend donc du placement du boîtier et du mouvement réalisé. Le compteur embarqué rend la valeur cohérente et cumulative pendant une séance, mais il ne prétend pas atteindre la précision d'un podomètre industriel ou d'une montre sportive calibrée.
+L'exécution native est utile pour déboguer un composant isolé.
 
-\subsection{Analyse vidéo}
+\paragraph{API Node.js}
+\begin{lstlisting}[language=bash]
+cd TrackrAPI
+npm install
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r ai/requirements.txt
+npm run dev
+\end{lstlisting}
 
-Le squat est le mode le plus fiable. Les modes développé couché et soulevé de terre sont fonctionnels mais expérimentaux. Une amélioration future consiste à constituer un jeu de vidéos annotées, à valider les seuils par morphologie et à intégrer plusieurs angles de caméra.
+\paragraph{Frontend Vue}
+\begin{lstlisting}[language=bash]
+cd WebTrackr
+npm install
+npm run dev
+\end{lstlisting}
 
-\subsection{Intelligence artificielle}
+\paragraph{Serveur central Java}
+\begin{lstlisting}[language=bash]
+cd CentralServer
+javac -cp "lib/*" server/src/*.java client/src/*.java
+java -cp "lib/*:server/src:client/src" TrackrCentralServer 9000
+\end{lstlisting}
 
-Le modèle cardiaque est entraîné sur 105 paires observées, dont 81 issues de PAMAP2 et 24 de TrackrAI. Malgré un coefficient $R^2$ de 0,793, sa MAE de 6,172 bpm ne bat pas encore la baseline à 5,434 bpm. L'application expose cette limite et interdit au modèle de justifier seul une hausse de charge. L'objectif prioritaire est de collecter davantage de séances comparables par sportif, de suivre l'erreur prévue/réelle et de réévaluer le modèle avec une validation par individu. Un assistant LLM de génération de programmes reste une perspective distincte et ne doit pas être confondu avec ce modèle prédictif.
+\clearpage
 
-\subsection{Sécurité et production}
+\paragraph{Serveur d'analyse Python}
+\begin{lstlisting}[language=bash]
+cd AnalyzeServer
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+\end{lstlisting}
 
-Les secrets présents dans les fichiers Docker Compose sont adaptés à une démonstration. En production, ils doivent être injectés par un gestionnaire de secrets ou des variables d'environnement non versionnées. L'ajout d'une journalisation centralisée, d'une rotation de secrets et d'une politique CORS plus stricte constitue également une amélioration naturelle.
+\subsection{Configuration du boîtier ESP32}
 
-\section{Annexes}
+Le projet PlatformIO utilise l'environnement \code{esp32dev}. Après compilation et téléversement, le boîtier crée un point d'accès \code{Trackr-ESP32} lorsqu'aucune configuration réseau exploitable n'est enregistrée. Le portail WiFiManager demande le SSID, le mot de passe, l'adresse de la machine qui héberge Docker et le port 29000.
 
-\subsection{Résumé des ports}
+Un maintien du bouton BOOT pendant cinq secondes au démarrage efface la configuration Wi-Fi, l'adresse du serveur et la clé du module. Le boîtier redémarre ensuite en mode de configuration.
 
-\begin{longtable}{p{4cm}p{3cm}p{7cm}}
+\subsection{Construction de l'application Android}
+
+Le frontend intègre Capacitor et un projet Android. Après modification de l'interface, la synchronisation s'effectue par :
+
+\begin{lstlisting}[language=bash]
+cd WebTrackr
+npm install
+npm run build
+npx cap sync android
+npx cap open android
+\end{lstlisting}
+
+Le fichier \code{capacitor.config.json} correspond à la configuration standard, tandis que \code{capacitor.config.dev.json} permet un chargement du serveur Vite pendant le développement.
+
+% =============================================================================
+\clearpage
+\section{Descriptif technique}
+\label{sec:descriptif}
+% =============================================================================
+
+\subsection{Boîtier d'acquisition ESP32}
+
+\subsubsection{Composants électroniques}
+
+Le boîtier utilise les composants répertoriés dans le \tabref{tab:materiel}. Les références sont identifiées à partir du matériel et du firmware livré.
+
+\begin{longtable}{L{4.2cm}L{5.2cm}L{6.6cm}}
+\caption{Composants électroniques du boîtier d'acquisition}\label{tab:materiel}\\
 \toprule
-\textbf{Service} & \textbf{Port dev} & \textbf{Description} \\
+\textbf{Élément} & \textbf{Référence} & \textbf{Rôle et communication} \\
 \midrule
-Frontend & 5173 & Interface Vite. \\
-API & 4567 & API HTTP Express. \\
-Serveur central & 29000 & Port TCP exposé pour les modules. \\
-Analyse vidéo & 6000 & WebSocket d'analyse. \\
+\endfirsthead
+\toprule
+\textbf{Élément} & \textbf{Référence} & \textbf{Rôle et communication} \\
+\midrule
+\endhead
+Microcontrôleur & ESP32-D0WDQ6 V3, profil PlatformIO \code{esp32dev} & Exécution du firmware, Wi-Fi, Bluetooth Low Energy, UART et I2C. \\
+Récepteur GPS & u-blox NEO-M8N-0-10 sur carte GY-GPSV3-NEO & Latitude, longitude et vitesse par UART2 à 9~600 bit/s. \\
+Module inertiel & MPU-9255 & Accéléromètre et gyroscope par I2C. Le magnétomètre n'est pas utilisé. \\
+Ceinture cardiaque & Geonaute/Oxylane ZT26D & Fréquence cardiaque et intervalles RR par BLE, service \code{0x180D}, caractéristique \code{0x2A37}. \\
+Bouton intégré & BOOT, GPIO 0 & Effacement de la configuration après maintien de cinq secondes. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Câblage et broches}
+
+Le câblage du boîtier est présenté dans le \tabref{tab:cablage-esp32}. Le GPS et le module inertiel partagent l'alimentation 3,3~V et la masse de la carte. Les seules liaisons de données filaires sont la sortie TX du GPS vers l'entrée RX2 de l'ESP32, puis les lignes SDA et SCL du bus I2C pour le module inertiel. La ceinture cardiaque communique sans fil en Bluetooth Low Energy.
+
+\begin{longtable}{L{3.7cm}L{2.7cm}L{4.2cm}L{5.4cm}}
+\caption{Câblage du boîtier d'acquisition}\label{tab:cablage-esp32}\\
+\toprule
+\textbf{Composant} & \textbf{Broche} & \textbf{Connexion ESP32} & \textbf{Fonction} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Composant} & \textbf{Broche} & \textbf{Connexion ESP32} & \textbf{Fonction} \\
+\midrule
+\endhead
+GPS u-blox NEO-M8N & VCC & 3,3~V & Alimentation du module GPS. \\
+GPS u-blox NEO-M8N & GND & GND & Masse commune avec l'ESP32. \\
+GPS u-blox NEO-M8N & TX & GPIO 27, entrée RX2 & Réception des trames NMEA à 9~600 bit/s. \\
+GPS u-blox NEO-M8N & RX & Non connecté & Le firmware ne transmet aucune commande au GPS. \\
+MPU-9255 & VCC & 3,3~V & Alimentation du module inertiel. \\
+MPU-9255 & GND & GND & Masse commune avec l'ESP32. \\
+MPU-9255 & SDA & GPIO 19 & Ligne de données du bus I2C. \\
+MPU-9255 & SCL & GPIO 22 & Ligne d'horloge du bus I2C. \\
+Ceinture Geonaute ZT26D & Aucun fil & Bluetooth Low Energy & Service Heart Rate \code{0x180D} et caractéristique \code{0x2A37}. \\
+Bouton BOOT intégré & --- & GPIO 0 & Entrée \code{INPUT\_PULLUP}; maintien pendant cinq secondes pour effacer la configuration. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Organisation du firmware}
+
+Le firmware est contenu dans un sketch unique, \code{arduino/src/sketch_esp/sketch_esp.ino}. Cette organisation reste simple, mais le fichier regroupe plusieurs responsabilités centrales :
+
+\begin{itemize}
+  \item configuration Wi-Fi et serveur avec \code{WiFiManager};
+  \item stockage persistant avec \code{Preferences};
+  \item lecture GPS par \code{HardwareSerial} et \code{NeoGPS};
+  \item acquisition inertielle par la bibliothèque \code{Electronic Cats MPU6050};
+  \item découverte et abonnement à la ceinture cardiaque BLE;
+  \item calcul de la RMSSD à partir des intervalles RR;
+  \item comptage embarqué des pas;
+  \item protocole TCP avec le serveur central.
+\end{itemize}
+
+Les fonctions centrales sont décrites dans le \tabref{tab:fonctions-esp}.
+
+\begin{longtable}{L{4.6cm}L{11.4cm}}
+\caption{Fonctions centrales du firmware ESP32}\label{tab:fonctions-esp}\\
+\toprule
+\textbf{Fonction} & \textbf{Responsabilité} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Fonction} & \textbf{Responsabilité} \\
+\midrule
+\endhead
+\code{setupWiFi()} & Ouvre le portail de configuration, récupère l'adresse et le port du serveur puis les stocke en mémoire flash. \\
+\code{autoRegister()} & Envoie \code{AUTOREGISTER esp32 gps imu hr} et mémorise la clé renvoyée. \\
+\code{sendHello()} & Identifie un module déjà enregistré avec \code{HELLO moduleKey}. \\
+\code{handleServerCommands()} & Active ou désactive l'enregistrement après \code{START_SESSION} ou \code{STOP_SESSION}. \\
+\code{sendMeasure()} & Formate une commande \code{STOREMEASURE} et bloque l'envoi hors séance. \\
+\code{updateStepCounter()} & Échantillonne l'accélération à 25~Hz et détecte les pics de mouvement. \\
+\code{hrNotifyCallback()} & Décode la fréquence cardiaque et les intervalles RR reçus par BLE. \\
+\code{computeRMSSD()} & Calcule la racine carrée de la moyenne des différences successives des intervalles RR. \\
+\code{factoryReset()} & Efface les préférences et la configuration WiFiManager. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Acquisition, filtrage et émission}
+
+Le GPS est lu en continu, mais une position n'est émise que si elle est valide. Deux positions successives doivent être séparées d'au moins 1,5~m et de 800~ms. La vitesse n'est transmise que lorsqu'elle est valide et supérieure ou égale à 0,5~km/h. Ces seuils réduisent les points immobiles et les variations liées au bruit du récepteur.
+
+Le module inertiel est calibré au démarrage. Un filtre passe-bas à 20~Hz est activé par \code{setDLPFMode}. Après un échauffement de trois secondes, les six axes sont transmis environ une fois par seconde. Le compteur de pas utilise en parallèle un échantillonnage à 25~Hz, une ligne de base lissée, un seuil de pic, un seuil de relâchement et un délai minimal de 280~ms entre deux pas.
+
+La fréquence cardiaque est lue dans la caractéristique BLE Heart Rate Measurement. Lorsque le drapeau RR est présent, les intervalles sont convertis de 1/1024~s en millisecondes et placés dans un tampon circulaire de 64 valeurs. La RMSSD est transmise dès qu'au moins trois valeurs sont disponibles.
+
+Les types de mesures produits sont récapitulés en \annref{ann:mesures}.
+
+\subsection{Serveur central Java}
+
+\subsubsection{Organisation des sources}
+
+Les sources du serveur sont situées dans \code{CentralServer/server/src}. Le \tabref{tab:central-files} indique les fichiers à modifier selon le type d'évolution.
+
+\begin{longtable}{L{5.0cm}L{11.0cm}}
+\caption{Principaux fichiers du serveur central}\label{tab:central-files}\\
+\toprule
+\textbf{Fichier} & \textbf{Rôle} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Fichier} & \textbf{Rôle} \\
+\midrule
+\endhead
+\code{TrackrCentralServer.java} & Point d'entrée; vérifie le port puis crée \code{MainServer}. \\
+\code{MainServer.java} & Ouvre la socket d'écoute, accepte les clients et conserve la table des modules connectés. \\
+\code{ThreadServer.java} & Traite une connexion TCP, interprète les commandes et maintient l'état de séance. \\
+\code{DataExchanger.java} & Regroupe les pilotes de données utilisés par les threads. \\
+\code{DataDriver.java} & Interface des opérations de stockage, d'enregistrement et de vérification de séance. \\
+\code{HttpDataDriver.java} & Implémentation principale vers l'API; ajoute l'en-tête \code{x-service-secret}. \\
+\code{MongoDataDriver.java} & Accès direct historique à MongoDB, encore utilisé pour \code{STOREANALYSIS}. \\
+\bottomrule
+\end{longtable}
+
+L'interface \code{DataDriver} permet de remplacer la destination des données sans modifier la logique TCP. L'ajout d'une opération nécessite de déclarer la méthode dans l'interface, puis de l'implémenter dans les pilotes concernés. L'implémentation HTTP constitue la voie principale pour les mesures et les modules, car elle centralise les validations dans l'API.
+
+\subsubsection{Protocole TCP et état des connexions}
+
+Le protocole est textuel, avec une commande par ligne. Les commandes principales sont présentées dans le \tabref{tab:tcp-commandes}.
+
+\begin{longtable}{L{5.3cm}L{10.7cm}}
+\caption{Commandes du protocole TCP}\label{tab:tcp-commandes}\\
+\toprule
+\textbf{Commande} & \textbf{Traitement} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Commande} & \textbf{Traitement} \\
+\midrule
+\endhead
+\code{AUTOREGISTER uc chipsets...} & Crée un module et retourne son nom, son nom court et sa clé. \\
+\code{HELLO moduleKey} & Associe la connexion courante à un module enregistré et met à jour son état connecté. \\
+\code{START_SESSION_FOR_MODULE key sessionId} & Commande API vers serveur central; associe une séance à la connexion ciblée et transmet \code{START_SESSION}. \\
+\code{STOP_SESSION_FOR_MODULE key} & Demande l'arrêt d'une séance et transmet \code{STOP_SESSION}. \\
+\code{STOREMEASURE type date value moduleKey} & Enregistre une mesure seulement si la connexion est dans l'état \code{RUNNING}. \\
+\code{STOREANALYSIS type date analysisId|value} & Enregistre un résultat vidéo par le pilote MongoDB historique. \\
+\code{FORCE_DISCONNECT_MODULE key} & Ferme la connexion ciblée, notamment après action du watchdog. \\
+\bottomrule
+\end{longtable}
+
+Chaque \code{ThreadServer} conserve un état \code{IDLE}, \code{RUNNING} ou \code{STOPPING}, ainsi que l'identifiant de la séance courante. Hors état \code{RUNNING}, une mesure est absorbée et reçoit la réponse \code{OK IGNORED}. Cette logique fait du protocole TCP la première barrière contre l'enregistrement de mesures hors séance.
+
+\clearpage
+
+Lorsqu'un même module se reconnecte, l'ancienne socket est fermée et remplacée dans la table des connexions. La méthode de nettoyage ne marque le module déconnecté que si le thread correspond encore à la connexion active, ce qui évite qu'un ancien thread invalide une nouvelle connexion.
+
+\subsection{API Node.js et Express}
+
+\subsubsection{Organisation des sources}
+
+L'API est démarrée par \code{TrackrAPI/TrackrAPI.js}. Elle établit la connexion MongoDB, initialise les données de démonstration, charge le modèle IA et monte les routes sous le préfixe \code{/trackrapi}.
+
+\begin{longtable}{L{4.8cm}L{11.2cm}}
+\caption{Organisation de l'API}\label{tab:api-files}\\
+\toprule
+\textbf{Répertoire ou fichier} & \textbf{Fonction} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Répertoire ou fichier} & \textbf{Fonction} \\
+\midrule
+\endhead
+\code{routes/trackrapi.route.js} & Déclaration des routes et enchaînement des middlewares de sécurité. \\
+\code{controllers/} & Validation des requêtes et logique de gestion des utilisateurs, modules, mesures, séances et IA. \\
+\code{models/} & Schémas et modèles Mongoose. \\
+\code{services/} & Communication TCP, exécution des scripts IA et watchdog de séance. \\
+\code{utils/} & Filtrage GPS, calcul physiologique, agrégation et score déterministe. \\
+\code{config/swaggerConfig.js} & Définition OpenAPI 3.0 exposée par Swagger UI. \\
+\code{ai/} & Préparation des données PAMAP2, entraînement, sérialisation et prévision cardiaque avec XGBoost. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Authentification et autorisations}
+
+La connexion directe compare le mot de passe avec son hash bcrypt. Lorsqu'elle réussit, l'API crée :
+
+\begin{itemize}
+  \item un access token JWT signé avec \code{JWT_SECRET};
+  \item un identifiant \code{jti}, également stocké dans \code{user.sessionId};
+  \item un refresh token opaque stocké dans \code{user.refreshToken};
+  \item les dates d'expiration correspondantes.
+\end{itemize}
+
+Le middleware \code{verifyToken} vérifie la signature, l'expiration et la correspondance du \code{jti} avec la base. La révocation est donc effective après déconnexion ou rotation des jetons. Les routes internes utilisent \code{verifyServiceSecret}, qui compare l'en-tête \code{x-service-secret} avec la variable \code{SERVICE_SECRET}.
+
+Les autorisations de lecture sont également appliquées lors des requêtes. Un sportif obtient ses propres séances et mesures. Un coach obtient celles des sportifs dont le champ \code{coach} référence son identifiant. Un administrateur n'est pas filtré par propriétaire.
+
+\subsubsection{Routes HTTP}
+
+Le \tabref{tab:api-routes} décrit les routes, les informations lues ou modifiées dans MongoDB et les principales données renvoyées. Les exemples JSON sont fournis en \annref{ann:json}. La documentation interactive complète est disponible sur \code{/trackrapi/api-docs}.
+
+\begin{longtable}{L{1.5cm}L{4.2cm}L{4.0cm}L{6.3cm}}
+\caption{Routes principales de l'API}\label{tab:api-routes}\\
+\toprule
+\textbf{Méth.} & \textbf{Chemin} & \textbf{Accès et données reçues} & \textbf{Traitement MongoDB et réponse} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Méth.} & \textbf{Chemin} & \textbf{Accès et données reçues} & \textbf{Traitement MongoDB et réponse} \\
+\midrule
+\endhead
+GET & \code{/health} & Public & Retourne l'état du processus et son temps de fonctionnement. \\
+POST & \code{/auth/signin} & Public; \code{login}, \code{password} & Lit \code{users}; retourne l'utilisateur, un JWT et un refresh token. \\
+POST & \code{/auth/refresh} & Refresh token & Lit et met à jour \code{users}; renouvelle le \code{jti}, le JWT et le refresh token. \\
+POST & \code{/auth/logout} & JWT & Efface la session et le refresh token dans \code{users}. \\
+GET & \code{/auth/me} & JWT & Retourne l'utilisateur authentifié sans les champs secrets. \\
+POST & \code{/module/register} & Secret de service; \code{uc}, liste de chipsets & Lit \code{chipsets}, crée un document \code{modules} et retourne la clé. \\
+POST & \code{/module/connection} & Secret de service; clé, booléen connecté & Met à jour \code{connected} et \code{lastSeen} dans \code{modules}. \\
+POST & \code{/module/create} & Administrateur & Crée manuellement un module. \\
+PATCH & \code{/module/update} & Administrateur & Modifie les champs autorisés d'un module. \\
+GET & \code{/module/get} & JWT; filtres éventuels & Lit et retourne les modules autorisés. \\
+POST & \code{/user/create} & Administrateur & Vérifie l'unicité du login, hash le mot de passe et crée un utilisateur. \\
+PATCH & \code{/user/update} & Administrateur & Modifie les données, les droits ou l'affectation d'un coach. \\
+GET & \code{/user/getusers} & Administrateur ou coach & Retourne tous les utilisateurs ou uniquement les sportifs affectés au coach. \\
+POST & \code{/session/start} & JWT; \code{moduleKey} & Crée une session ouverte puis demande au serveur central de démarrer le module. \\
+POST & \code{/session/stop} & JWT; \code{moduleKey} & Lit les mesures, calcule les statistiques, ferme la séance, évalue la prévision précédente et prépare la prévision cardiaque suivante. \\
+POST & \code{/session/active} & Secret de service; \code{sessionId} & Vérifie l'existence d'une session non terminée. \\
+POST & \code{/session/active-for-module} & JWT; \code{moduleKey} & Retourne l'état et les dates de la session active du module. \\
+GET & \code{/session/history} & JWT & Lit les séances, applique le périmètre du rôle et retourne les utilisateurs/modules peuplés. \\
+POST & \code{/measure/create} & Secret de service; type, date, valeur, session & Crée une mesure si la séance est ouverte et met à jour la dernière activité. \\
+PATCH & \code{/measure/update} & Administrateur & Modifie uniquement \code{type}, \code{date} ou \code{value}. \\
+GET & \code{/measure/get} & JWT; clé, type, dates & Lit les mesures filtrées selon le rôle et les paramètres. \\
+POST & \code{/analysis} & JWT; \code{analysisId}, exercice, résultat & Effectue un upsert par \code{analysisId} et stocke le résultat encodé en base64. \\
+GET & \code{/analysis} & JWT; \code{limit} & Retourne l'historique filtré des analyses autorisées. \\
+GET & \code{/analysis/:analysisId} & JWT & Retourne le résultat décodé si l'utilisateur possède l'accès. \\
+POST & \code{/ai/train} & Administrateur & Entraîne le modèle de prévision cardiaque et retourne les données d'entraînement ainsi que les métriques. \\
+GET & \code{/ai/predict/:sessionId} & JWT & Retourne la fréquence cardiaque moyenne prévue pour la prochaine séance comparable, la plage attendue et les métriques du modèle. \\
+GET & \code{/ai/insights/:sessionId} & JWT & Retourne la prévision cardiaque, son évaluation éventuelle et une recommandation prudente pour la séance suivante. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Calcul des statistiques et watchdog}
+
+La fonction \code{computeSessionStats()} regroupe les mesures par type. Le module \code{geo.js} filtre la trace et calcule la distance par la formule de Haversine. Le module \code{physio.js} estime le stress et fournit un calcul de secours des pas lorsque la mesure \code{steps} n'existe pas. Le score déterministe est calculé dans \code{performanceScore.js}.
+
+Le nombre de pas provient en priorité de la dernière valeur cumulative transmise par l'ESP32. Cette valeur est conservée telle quelle dans les statistiques. Les trois axes d'accélération ne sont utilisés qu'en solution de secours.
+
+Le service \code{session.service.js} exécute un contrôle toutes les trois secondes. Une séance ouverte est clôturée si le module est marqué déconnecté, si aucune mesure n'est reçue pendant plus de dix secondes ou si aucune fréquence cardiaque positive n'est reçue pendant plus de quarante-cinq secondes après la période initiale. Avant fermeture, les statistiques sont calculées et le serveur central reçoit \code{FORCE_DISCONNECT_MODULE}.
+
+\subsubsection{Documentation Swagger}
+
+La configuration \code{swagger-jsdoc} produit un document OpenAPI 3.0. L'interface Swagger est exposée sur :
+
+\begin{itemize}
+  \item \url{http://localhost:4567/trackrapi/api-docs};
+  \item \url{http://localhost:4567/trackrapi/swagger.json} pour la version JSON.
+\end{itemize}
+
+L'interface conserve l'autorisation entre les requêtes et permet de renseigner le JWT ou le secret de service selon la route testée.
+
+\subsection{Base de données MongoDB}
+
+\subsubsection{Modèles de documents}
+
+Les schémas Mongoose sont contenus dans \code{TrackrAPI/models}. Le \tabref{tab:modeles-mongo} décrit les champs nécessaires à la reprise de la base.
+
+\begin{longtable}{L{3.0cm}L{8.7cm}L{4.3cm}}
+\caption{Modèles de documents MongoDB}\label{tab:modeles-mongo}\\
+\toprule
+\textbf{Modèle} & \textbf{Champs principaux} & \textbf{Relations et contraintes} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Modèle} & \textbf{Champs principaux} & \textbf{Relations et contraintes} \\
+\midrule
+\endhead
+\code{User} & \code{login}, \code{password}, \code{email}, \code{rights}, \code{sessionId}, \code{sessionExpiresAt}, \code{refreshToken}, \code{refreshExpiresAt} & \code{coach} référence un autre \code{User}. Les droits appartiennent à l'énumération de configuration. \\
+\code{Chipset} & \code{name}, \code{description}, \code{links}, \code{caps} & \code{name} et chaque capacité sont requis selon le schéma. \\
+\code{Modules} & \code{name}, \code{shortName}, \code{key}, \code{uc}, \code{connected}, \code{lastSeen} & \code{chipsets} contient des références vers \code{Chipset}. La clé identifie le boîtier dans le protocole TCP. \\
+\code{Session} & \code{sessionId}, \code{startDate}, \code{lastMeasureAt}, \code{lastHeartRateAt}, \code{endDate}, \code{stats} & \code{sessionId} est unique; \code{user} et \code{module} sont requis. \\
+\code{Measure} & \code{type}, \code{date}, \code{value}, \code{analysisId} & Références facultatives vers \code{Modules} et \code{Session}; index simple sur \code{analysisId}. \\
+\bottomrule
+\end{longtable}
+
+Le champ \code{value} d'une mesure reste une chaîne de caractères afin d'accepter des types de mesures hétérogènes. Les conversions numériques sont réalisées au moment de l'agrégation. Le champ \code{stats} d'une séance est de type \code{Mixed}, ce qui facilite l'évolution du contenu statistique, mais impose une validation applicative plutôt qu'un contrôle strict du schéma.
+
+\subsubsection{Relations et index}
+
+Une séance appartient à un utilisateur et à un module. Une mesure appartient à une séance et peut référencer le module d'origine. Un module possède plusieurs chipsets. Un sportif peut référencer un coach.
+
+L'index unique sur \code{Session.sessionId} empêche la duplication d'un identifiant de séance. Le champ \code{Measure.analysisId} est indexé mais non unique. La route \code{POST /analysis} limite les doublons par un upsert; la voie TCP historique peut toutefois insérer une seconde entrée. La consolidation de ce flux fait partie des recommandations de reprise.
+
+Des exemples de documents sont fournis en \annref{ann:mongo}.
+
+\subsection{Frontend Vue et application mobile}
+
+\subsubsection{Organisation des sources}
+
+Le code principal est situé dans \code{WebTrackr/src}. Les vues regroupent les écrans métier, les services isolent les communications, les stores Pinia conservent l'état applicatif et les composants factorisent les graphiques et cartes.
+
+\begin{longtable}{L{5.0cm}L{11.0cm}}
+\caption{Principaux répertoires du frontend}\label{tab:frontend-files}\\
+\toprule
+\textbf{Chemin} & \textbf{Usage} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Chemin} & \textbf{Usage} \\
+\midrule
+\endhead
+\code{src/views/} & Connexion, démarrage, tableau de bord, historique, détail, comparaison, administration, espaces coach et analyse vidéo. \\
+\code{src/components/} & Graphiques, jauges, carte GPS, navigation et composants de comparaison. \\
+\code{src/services/} & Clients HTTP, authentification, séances, modules, utilisateurs, IA et WebSocket vidéo. \\
+\code{src/store/} & Stores Pinia pour l'authentification, les mesures, les sessions, les modules, les utilisateurs et l'IA. \\
+\code{src/router/index.js} & Déclaration des routes et contrôle d'accès par rôle. \\
+\code{src/utils/} & Adaptation des mesures, données de graphiques, fonctions GPS et physiologiques. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Communication HTTP et gestion des jetons}
+
+Le service \code{api.service.js} utilise Axios. L'access token est placé dans \code{Authorization: Bearer}; une copie de compatibilité peut être placée dans \code{x-session-id}. Lorsqu'une réponse 401 est reçue, un seul renouvellement est tenté. Si le refresh réussit, la requête initiale est rejouée; sinon, le store d'authentification est vidé et l'utilisateur revient à la page de connexion.
+
+Les gardes du routeur masquent les pages incompatibles avec le rôle. Elles ne remplacent pas les vérifications de l'API, qui restent la source de vérité pour les autorisations.
+
+\subsection{Serveur d'analyse vidéo Python}
+
+\subsubsection{Répertoires et fichiers principaux}
+
+Le serveur est lancé par \code{AnalyzeServer/main.py}, qui démarre le WebSocket défini dans \code{ws_server.py}. Les responsabilités sont séparées entre le protocole, le stockage temporaire, l'extraction de pose et les analyseurs métier.
+
+\begin{longtable}{L{5.2cm}L{10.8cm}}
+\caption{Organisation du serveur d'analyse vidéo}\label{tab:analyse-files}\\
+\toprule
+\textbf{Fichier} & \textbf{Rôle} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Fichier} & \textbf{Rôle} \\
+\midrule
+\endhead
+\code{ws_server.py} & Réception des messages, création du contexte d'analyse et orchestration générale. \\
+\code{protocol/messages.py} & Constantes et validation des messages du protocole WebSocket. \\
+\code{stream_io/video_receiver.py} & Réception et écriture des blocs vidéo. \\
+\code{stream_io/temp_storage.py} & Création et suppression des fichiers temporaires. \\
+\code{analysis/pose_extractor.py} & Lecture de la vidéo et extraction des repères MediaPipe. \\
+\code{analysis/metrics.py} & Calculs d'angles, normalisation et lissage. \\
+\code{analysis/analyzer_registry.py} & Association d'un nom d'exercice à son analyseur. \\
+\code{analysis/squat_analyzer.py} & Détection des répétitions et défauts du squat. \\
+\code{analysis/bench_analyzer.py} & Analyse expérimentale du développé couché. \\
+\code{analysis/deadlift_analyzer.py} & Analyse expérimentale du soulevé de terre. \\
+\code{central/central_tcp_client.py} & Transmission historique du résultat par \code{STOREANALYSIS}. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Protocole WebSocket}
+
+Une analyse suit trois étapes : \code{START_ANALYSIS}, un ou plusieurs messages \code{VIDEO_CHUNK}, puis \code{END_ANALYSIS}. Les blocs sont encodés en base64. Le serveur reconstitue le fichier, sélectionne l'analyseur demandé et renvoie le résultat JSON au client.
+
+Le squat constitue l'analyseur principal. Il exploite les angles de genou, l'inclinaison du buste et l'écart gauche/droite. Les répétitions sont détectées par la transition entre une position haute et une position basse. Les analyseurs du développé couché et du soulevé de terre utilisent respectivement les angles de coude et l'extension de hanche; ils restent expérimentaux.
+
+\subsubsection{Persistance des résultats}
+
+Le frontend enregistre le résultat avec \code{POST /analysis}. La route encode le JSON en base64 et réalise un upsert par \code{analysisId}. En parallèle, le serveur Python peut envoyer \code{STOREANALYSIS} au serveur central, qui utilise encore le pilote MongoDB direct et une insertion simple. Une seule voie de persistance doit être conservée lors d'une reprise afin d'éviter un doublon. La voie API est préférable, car elle associe le propriétaire et applique les contrôles d'accès.
+
+\subsection{Prévision cardiaque par apprentissage automatique}
+
+\subsubsection{Objectif et intégration dans les séances}
+
+Le module d'apprentissage automatique prévoit la fréquence cardiaque moyenne, exprimée en battements par minute, attendue lors de la prochaine séance présentant une durée et une charge comparables. La prévision est calculée à la fin d'une séance éligible puis enregistrée dans le champ \code{stats.aiPrediction} du document de séance.
+
+Lorsqu'une séance comparable suivante est terminée, la fonction \code{evaluatePreviousForecast()} recherche une prévision antérieure non évaluée du même sportif. Elle enregistre alors la fréquence cardiaque réellement mesurée, l'erreur absolue en bpm, l'identifiant de la séance utilisée pour l'évaluation et la date de cette évaluation. Le modèle produit ainsi une prévision vérifiable plutôt qu'un indicateur sans valeur observée ultérieure.
+
+La prévision est également utilisée pour générer une recommandation prudente. Le contrôleur combine la réponse cardiaque prévue, le stress, l'indicateur de récupération et les métriques du modèle. Une progression légère n'est proposée que si le modèle bat la baseline et si les indicateurs physiologiques sont favorables. Dans les autres cas, la charge est maintenue ou réduite. Ces indications restent informatives et ne constituent pas un avis médical.
+
+\subsubsection{Modèle, cible et caractéristiques}
+
+Le modèle sérialisé est un \code{XGBRegressor}. La cible \code{next_comparable_session_hr_avg} correspond à la fréquence cardiaque moyenne réellement observée lors de la prochaine séance comparable. Les treize caractéristiques utilisées sont :
+
+\begin{itemize}
+  \item \code{distanceKm}, \code{durationMin}, \code{hrAvg}, \code{hrMax}, \code{stress} et \code{steps};
+  \item \code{paceStepsPerMin};
+  \item \code{distanceVsHistory}, \code{stepsVsHistory}, \code{stressVsHistory} et \code{hrVsHistory};
+  \item \code{historyCount} et \code{daysSincePrevious}.
+\end{itemize}
+
+XGBoost est adapté à ce jeu de données tabulaires, accepte des relations non linéaires et conserve un temps d'inférence faible. Le modèle contient 160 arbres, une profondeur maximale de 3, un taux d'apprentissage de 0,05, ainsi que des coefficients \code{subsample} et \code{colsample_bytree} égaux à 0,9.
+
+Pour les séances TrackrAI, une observation locale n'est retenue que si les deux séances durent au moins cinq minutes, possèdent une fréquence cardiaque moyenne valide et disposent d'une charge mesurable par une distance d'au moins 0,1~km ou par au moins 100 pas. Les rapports de durée doivent être compris entre 0,6 et 1,67, et les rapports de charge entre 0,5 et 2.
+
+\subsubsection{Données d'entraînement et préparation PAMAP2}
+
+Le script \code{prepare_pamap2.py} prépare des données externes à partir de l'archive officielle PAMAP2 de l'UCI. Il lit les données cardiaques et inertielles des neuf sujets, les regroupe en fenêtres consécutives de 60 secondes appartenant à une même activité et associe chaque fenêtre à la fréquence cardiaque moyenne observée dans la fenêtre suivante.
+
+Le fichier externe généré contient 194 paires brutes. Après exclusion des activités sans charge locomotrice exploitable, le modèle livré utilise 81 paires PAMAP2 et 24 paires TrackrAI, soit 105 observations brutes. La séparation est effectuée par groupe avant augmentation afin qu'un même sujet ne soit pas simultanément présent dans l'entraînement et la validation.
+
+La séparation conserve 83 observations brutes pour l'entraînement et 22 pour la validation. Une augmentation synthétique de facteur 2 est appliquée uniquement au sous-ensemble d'entraînement, avec un bruit gaussien correspondant à 2,5~\% de la dispersion de chaque caractéristique. Elle produit 249 exemples d'entraînement. Le paquet de modèle décrit donc 271 exemples utilisés au total, validation comprise.
+
+\subsubsection{Métriques du modèle livré}
+
+\begin{table}[H]
+\centering
+\caption{Métriques de la prévision cardiaque XGBoost}
+\label{tab:ia-metrics}
+\begin{tabular}{lr}
+\toprule
+\textbf{Indicateur} & \textbf{Valeur} \\
+\midrule
+Paires observées brutes & 105 \\
+Paires TrackrAI & 24 \\
+Paires PAMAP2 & 81 \\
+Exemples d'entraînement après augmentation & 249 \\
+Exemples de validation & 22 \\
+MAE XGBoost & 6,172 bpm \\
+RMSE XGBoost & 7,907 bpm \\
+Coefficient $R^2$ & 0,793 \\
+MAE de la baseline & 5,434 bpm \\
+Le modèle bat la baseline & Non \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La baseline suppose que la fréquence cardiaque moyenne de la prochaine séance sera identique à celle de la séance courante. Sur la séparation actuelle, sa MAE de 5,434~bpm reste inférieure à la MAE de 6,172~bpm du modèle. La prévision est donc affichée à titre informatif, mais elle ne peut pas autoriser automatiquement une augmentation de la charge.
+
+\subsubsection{Prédiction, évaluation et réentraînement}
+
+Le script \code{predict_session.py} vérifie d'abord la qualité de la séance : durée minimale de cinq minutes, fréquence cardiaque comprise entre 40 et 220~bpm, et charge mesurable par la distance ou le nombre de pas. Il construit ensuite les treize caractéristiques à partir de la séance courante et de l'historique du sportif.
+
+La réponse contient notamment \code{predictedNextHrAvg}, la fréquence cardiaque actuelle, l'écart prévu en bpm et une plage attendue construite à partir de la MAE de validation. Elle fournit aussi les caractéristiques utilisées, les métriques, la provenance des données et la date d'entraînement.
+
+À la fin d'une séance comparable ultérieure, l'évaluation est stockée dans \code{stats.aiPrediction.evaluation} avec les champs \code{actualHrAvg}, \code{absoluteErrorBpm}, \code{evaluatedWithSessionId} et \code{evaluatedAt}. Cette rétroaction locale permet de suivre les erreurs réelles et d'alimenter les entraînements suivants.
+
+La fonction \code{maybeRetrain()} déclenche un réentraînement asynchrone lorsque le nombre de séances éligibles atteint un multiple de dix. L'entraînement manuel reste accessible aux administrateurs par \code{POST /ai/train}. Les routes \code{GET /ai/predict/:sessionId} et \code{GET /ai/insights/:sessionId} exposent respectivement la prévision détaillée et son interprétation pour la séance suivante.
+
+\clearpage
+
+\subsection{Tests et intégration continue}
+
+\subsubsection{Tests d'acceptation}
+
+Le projet \code{TrackrAIAcceptanceTests} utilise Maven, JUnit et Cucumber. Les scénarios couvrent notamment :
+
+\begin{itemize}
+  \item connexion valide et mot de passe incorrect;
+  \item auto-enregistrement et consultation des modules;
+  \item création, rejet et consultation de mesures;
+  \item consultation des utilisateurs sans exposition des champs sensibles;
+  \item commandes TCP valides, commandes inconnues et connexions simultanées;
+  \item stockage d'une analyse;
+  \item entraînement, prévision cardiaque, évaluation et recommandations IA.
+\end{itemize}
+
+Les tests s'exécutent par :
+
+\begin{lstlisting}[language=bash]
+cd TrackrAIAcceptanceTests
+mvn -B test
+\end{lstlisting}
+
+\subsubsection{GitLab CI et Jenkins}
+
+Le dépôt contient deux pipelines d'intégration continue. Ils utilisent le même environnement \code{docker-compose.ci.yml}.
+
+Le pipeline GitLab comporte trois étapes : validation du fichier Compose, construction des images et tests. Le job de test démarre les services, attend leurs healthchecks, vérifie l'API et le frontend, puis lance les tests Maven. Le pipeline Jenkins ajoute une étape explicite de récupération des sources, mais réalise les mêmes contrôles. Dans les deux cas, les conteneurs et volumes temporaires sont supprimés en fin d'exécution.
+
+Ces pipelines ne déploient pas l'application sur un serveur de production. Ils valident la construction et les fonctions couvertes par les tests d'acceptation.
+
+\subsection{Sécurité, limites connues et reprise}
+\label{sec:limites}
+
+\subsubsection{Mesures de sécurité existantes}
+
+Les mots de passe sont hashés avec bcrypt. Les routes utilisateur sont protégées par JWT et contrôles de rôle. Les échanges internes Java/API utilisent un secret de service. Les lectures de séances, mesures et analyses appliquent un filtre par propriétaire ou par affectation coach.
+
+\subsubsection{Limites techniques connues}
+
+\begin{itemize}
+  \item Le GPS et le compteur de pas dépendent du placement du boîtier et des conditions d'utilisation.
+  \item L'analyse vidéo dépend de l'angle de caméra et de la visibilité des articulations; seul le squat dispose du niveau de validation principal.
+  \item Le modèle cardiaque utilise encore peu de paires TrackrAI et ne bat pas la baseline sur la validation actuelle; ses prévisions restent informatives et doivent être réévaluées avec davantage de séances comparables.
+\end{itemize}
+
+\subsubsection{Fichiers à modifier pour étendre l'application}
+
+\begin{longtable}{L{5.2cm}L{10.8cm}}
+\caption{Points d'entrée pour une reprise ou une extension}\label{tab:reprise}\\
+\toprule
+\textbf{Évolution} & \textbf{Fichiers à examiner} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Évolution} & \textbf{Fichiers à examiner} \\
+\midrule
+\endhead
+Ajouter un type de mesure & Sketch ESP32, \code{measure.controller.js}, \code{sessionStats.js}, adaptateurs et graphiques du frontend. \\
+Ajouter une commande TCP & \code{ThreadServer.java}, éventuellement \code{DataDriver} et ses implémentations. \\
+Ajouter une route API & \code{trackrapi.route.js}, contrôleur concerné, modèle Mongoose et configuration Swagger. \\
+Ajouter une collection & Nouveau schéma et modèle dans \code{TrackrAPI/models}, initialisation éventuelle dans \code{db.init.js}. \\
+Ajouter un exercice vidéo & Nouvel analyseur Python, enregistrement dans \code{analyzer_registry.py}, choix dans le frontend. \\
+Modifier le score déterministe & \code{performanceScore.js} et tests associés. \\
+Modifier le modèle IA & \code{prepare_pamap2.py}, \code{train_model.py}, \code{predict_session.py}, \code{maybeRetrain.js}, \code{ai.controller.js} et routes IA. \\
+Ajouter un écran & Vue Vue, routeur, service, store éventuel et contrôles d'accès API. \\
+\bottomrule
+\end{longtable}
+
+% =============================================================================
+% TABLES DE FIN DE CORPS
+% =============================================================================
+\clearpage
+\phantomsection
+\addcontentsline{toc}{section}{Table des illustrations}
+\listoffigures
+
+\clearpage
+\phantomsection
+\addcontentsline{toc}{section}{Table des annexes}
+\listofannexes
+
+% =============================================================================
+% ANNEXES : pagination romaine indépendante
+% =============================================================================
+\clearpage
+\pagenumbering{Roman}
+
+\trackannex{Dépendances et versions des composants}{ann:dependances}
+
+\begin{longtable}{L{4.2cm}L{4.0cm}L{7.8cm}}
+\toprule
+\textbf{Composant} & \textbf{Version} & \textbf{Utilisation} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Composant} & \textbf{Version} & \textbf{Utilisation} \\
+\midrule
+\endhead
+Vue & 3.5.24 & Interface utilisateur. \\
+Vite & 7.2.4 & Serveur et compilation frontend. \\
+Pinia & 3.0.4 & Gestion de l'état. \\
+Vue Router & 4.6.3 & Navigation et gardes. \\
+Axios & 1.13.2 & Requêtes HTTP. \\
+Chart.js & 4.5.1 & Graphiques. \\
+Leaflet & 1.9.4 & Carte GPS. \\
+Capacitor Core / Android & 8.0.0 & Enveloppe mobile Android. \\
+Express & 4.17.1 & API HTTP. \\
+Mongoose & 5.13.9 & Accès MongoDB. \\
+jsonwebtoken & 8.5.1 & Signature et vérification des JWT. \\
+bcryptjs & 2.4.3 & Hashage des mots de passe. \\
+swagger-jsdoc & 6.3.0 & Génération OpenAPI. \\
+swagger-ui-express & 5.0.1 & Interface Swagger. \\
+MongoDB & 6.0 & Base de données. \\
+Java & 21 & Serveur central. \\
+MongoDB Java Driver & 4.10.2 & Pilote historique du serveur central. \\
+Python & 3.10 & Serveur d'analyse. \\
+MediaPipe & 0.10.14 & Extraction de pose. \\
+websockets & 12.0 & Serveur WebSocket Python. \\
+NumPy & inférieur à 2 pour l'analyse & Calculs numériques. \\
+pandas & 2.2.2 & Préparation des données IA. \\
+scikit-learn & 1.5.1 & Séparation et métriques. \\
+XGBoost & 2.1.1 & Prévision de la fréquence cardiaque moyenne de la prochaine séance comparable. \\
+joblib & 1.4.2 & Sérialisation du modèle. \\
+WiFiManager & 2.0.17 & Configuration Wi-Fi du boîtier. \\
+Electronic Cats MPU6050 & 1.4.2 & Accès aux registres inertiels du MPU-9255. \\
+NeoGPS & 4.2.9 & Décodage des trames NMEA. \\
+\bottomrule
+\end{longtable}
+
+\trackannex{Exemples de structures JSON de l'API}{ann:json}
+
+\subsection*{Connexion}
+\begin{lstlisting}
+POST /trackrapi/auth/signin
+{
+  "login": "corentin",
+  "password": "corentin"
+}
+\end{lstlisting}
+
+\begin{lstlisting}
+{
+  "error": 0,
+  "status": 200,
+  "data": {
+    "user": { "login": "corentin", "rights": ["basic"] },
+    "token": "<access-token-jwt>",
+    "refreshToken": "<refresh-token>"
+  }
+}
+\end{lstlisting}
+
+\subsection*{Démarrage d'une séance}
+\begin{lstlisting}
+POST /trackrapi/session/start
+Authorization: Bearer <access-token>
+{
+  "moduleKey": "<cle-du-module>"
+}
+\end{lstlisting}
+
+\begin{lstlisting}
+{
+  "error": 0,
+  "status": 201,
+  "data": { "sessionId": "<uuid>" }
+}
+\end{lstlisting}
+
+\clearpage
+
+\subsection*{Enregistrement d'une analyse vidéo}
+\begin{lstlisting}
+POST /trackrapi/analysis
+Authorization: Bearer <access-token>
+{
+  "analysisId": "<uuid>",
+  "exercise": "squat",
+  "type": "SPORT",
+  "result": {
+    "repetitions": 8,
+    "score": 76,
+    "errors": ["profondeur insuffisante"],
+    "advice": ["descendre davantage"]
+  }
+}
+\end{lstlisting}
+
+\subsection*{Prévision cardiaque pour la séance suivante}
+\begin{lstlisting}
+GET /trackrapi/ai/predict/<sessionId>
+Authorization: Bearer <access-token>
+
+{
+  "ok": true,
+  "predictedNextHrAvg": 148.6,
+  "currentHrAvg": 145.2,
+  "deltaBpm": 3.4,
+  "expectedRange": {
+    "min": 142.4,
+    "max": 154.8,
+    "basis": "validation_mae"
+  },
+  "target": "next_comparable_session_hr_avg",
+  "unit": "bpm"
+}
+\end{lstlisting}
+
+\trackannex{Exemples de documents MongoDB}{ann:mongo}
+
+\subsection*{Session}
+\begin{lstlisting}
+{
+  "sessionId": "f28e...",
+  "user": "ObjectId(...)" ,
+  "module": "ObjectId(...)" ,
+  "startDate": "2026-06-18T18:00:00Z",
+  "endDate": "2026-06-18T18:42:00Z",
+  "stats": {
+    "distanceKm": 4.8,
+    "durationMs": 2520000,
+    "steps": 6320,
+    "hrAvg": 146,
+    "stress": 54,
+    "score": { "global": 78.4 },
+    "aiPrediction": {
+      "predictedHrAvg": 148.6,
+      "deltaBpm": 3.4,
+      "target": "next_comparable_session_hr_avg",
+      "model": "XGBoost"
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection*{Mesure}
+\begin{lstlisting}
+{
+  "type": "heart_rate",
+  "date": "2026-06-18T18:12:25Z",
+  "value": "151",
+  "module": "ObjectId(...)" ,
+  "session": "ObjectId(...)"
+}
+\end{lstlisting}
+
+\trackannex{Types de mesures produits par le firmware}{ann:mesures}
+
+\begin{longtable}{L{4.0cm}L{5.0cm}L{7.0cm}}
+\toprule
+\textbf{Type} & \textbf{Origine} & \textbf{Valeur / unité} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Type} & \textbf{Origine} & \textbf{Valeur / unité} \\
+\midrule
+\endhead
+\code{gps_lat} & GPS NEO-M8N & Latitude en degrés décimaux. \\
+\code{gps_lon} & GPS NEO-M8N & Longitude en degrés décimaux. \\
+\code{gps_speed} & GPS NEO-M8N & Vitesse en km/h. \\
+\code{heart_rate} & Ceinture BLE & Battements par minute. \\
+\code{rmssd} & Intervalles RR BLE & Millisecondes. \\
+\code{acc_x}, \code{acc_y}, \code{acc_z} & Accéléromètre MPU-9255 & Valeurs brutes sur trois axes. \\
+\code{gyro_x}, \code{gyro_y}, \code{gyro_z} & Gyroscope MPU-9255 & Valeurs brutes sur trois axes. \\
+\code{steps} & Algorithme embarqué ESP32 & Nombre cumulatif de pas pendant la séance. \\
+\bottomrule
+\end{longtable}
+
+\trackannex{Variables d'environnement, ports et liens}{ann:env}
+
+\subsection*{Ports}
+\begin{longtable}{L{4.5cm}L{3cm}L{8.5cm}}
+\toprule
+\textbf{Service} & \textbf{Port} & \textbf{Utilisation} \\
+\midrule
+Frontend Vite & 5173 & Interface de développement. \\
+Frontend Nginx & 8080 & Interface de production locale. \\
+API & 4567 & HTTP et Swagger. \\
+Serveur central & 9000 interne / 29000 hôte & TCP des modules ESP32. \\
+Analyse vidéo & 6000 & WebSocket. \\
 MongoDB & 27017 & Base de données. \\
 \bottomrule
 \end{longtable}
 
-\subsection{Schéma électrique minimal}
-
-\begin{longtable}{p{4cm}p{4cm}p{6cm}}
-\toprule
-\textbf{Élément} & \textbf{Connexion ESP32} & \textbf{Rôle} \\
-\midrule
-GPS & RX sur GPIO 27 & Réception des trames NMEA. \\
-MPU6050 & SDA GPIO 19, SCL GPIO 22 & Accélération et gyroscope. \\
-Ceinture cardio BLE & Bluetooth Low Energy & Fréquence cardiaque et intervalles RR. \\
-Bouton BOOT & GPIO 0 & Réinitialisation longue de la configuration. \\
-\bottomrule
-\end{longtable}
-
-\subsection{Liens utiles}
-
+\subsection*{Liens de livraison et de documentation}
 \begin{itemize}
+  \item Dépôt GitLab : \url{https://gitlab.iut-bm.univ-fcomte.fr/fbornet/TrackrAI}
+  \item Guide développeur : fichier \code{DEV.md} à la racine du dépôt.
+  \item Documentation CI : \code{docs/CI_GITLAB_JENKINS.md}.
+  \item Swagger : \code{/trackrapi/api-docs}.
+  \item Document OpenAPI : \code{/trackrapi/swagger.json}.
   \item Documentation Docker : \url{https://docs.docker.com/}
-  \item Documentation Vue : \url{https://vuejs.org/}
-  \item Documentation Express : \url{https://expressjs.com/}
-  \item Documentation MongoDB : \url{https://www.mongodb.com/docs/}
-  \item Documentation MediaPipe : \url{https://developers.google.com/mediapipe}
-  \item Dataset PAMAP2 UCI : \url{https://archive.ics.uci.edu/dataset/231/pamap2+physical+activity+monitoring}
-  \item DOI PAMAP2 : \url{https://doi.org/10.24432/C5NW2H}
-  \item Documentation XGBoost : \url{https://xgboost.readthedocs.io/}
   \item Documentation PlatformIO : \url{https://docs.platformio.org/}
+  \item Documentation Vue : \url{https://vuejs.org/}
+  \item Documentation MongoDB : \url{https://www.mongodb.com/docs/}
+  \item Documentation MediaPipe : \url{https://ai.google.dev/edge/mediapipe/solutions/guide}
+  \item Documentation XGBoost : \url{https://xgboost.readthedocs.io/}
 \end{itemize}
 
 \end{document}
