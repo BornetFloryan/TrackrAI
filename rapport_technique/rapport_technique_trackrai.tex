@@ -52,7 +52,7 @@
 \usepackage{hyperref}
 \usepackage{xurl}
 
-\graphicspath{{images/}}
+\graphicspath{{images/}{.}}
 
 % -----------------------------------------------------------------------------
 % Couleurs et styles
@@ -65,13 +65,13 @@
 \definecolor{codegray}{HTML}{F7F7F7}
 
 \titleformat{\section}
-  {\color{trackrred}\bfseries\fontsize{17}{20}\selectfont}
+  {\color{trackrblue}\bfseries\fontsize{17}{20}\selectfont}
   {\thesection}{1em}{}
 \titleformat{\subsection}
-  {\color{trackrred}\bfseries\fontsize{14}{17}\selectfont}
+  {\color{trackrblue}\bfseries\fontsize{14}{17}\selectfont}
   {\thesubsection}{0.9em}{}
 \titleformat{\subsubsection}
-  {\color{trackrred}\bfseries\fontsize{12}{15}\selectfont}
+  {\color{trackrblue}\bfseries\fontsize{12}{15}\selectfont}
   {\thesubsubsection}{0.8em}{}
 
 \titlespacing*{\section}{0pt}{0pt}{1.1em}
@@ -89,6 +89,8 @@
 \renewcommand{\tablename}{Tableau}
 \renewcommand{\cftfigpresnum}{Figure~}
 \settowidth{\cftfignumwidth}{Figure~99~}
+\renewcommand{\cfttoctitlefont}{\color{trackrblue}\bfseries\fontsize{17}{20}\selectfont}
+\renewcommand{\cftloftitlefont}{\color{trackrblue}\bfseries\fontsize{17}{20}\selectfont}
 
 \captionsetup{
   font=it,
@@ -151,12 +153,13 @@
 \renewcommand{\cftannexesfont}{\normalfont}
 \renewcommand{\cftannexespagefont}{\normalfont}
 \renewcommand{\cftannexesleader}{\cftdotfill{\cftdotsep}}
+\renewcommand{\cftlantitlefont}{\color{trackrblue}\bfseries\fontsize{17}{20}\selectfont}
 \newcommand{\trackannex}[2]{%
   \clearpage
   \refstepcounter{annexes}%
   \phantomsection
   \addcontentsline{lan}{annexes}{Annexe \Roman{annexes} : #1}%
-  {\color{trackrred}\bfseries\fontsize{18}{22}\selectfont Annexe \Roman{annexes} : #1\par}
+  {\color{trackrblue}\bfseries\fontsize{18}{22}\selectfont Annexe \Roman{annexes} : #1\par}
   \label{#2}
   \vspace{1em}
 }
@@ -182,31 +185,42 @@
 % =============================================================================
 \begin{titlepage}
   \thispagestyle{empty}
-  \begin{minipage}[t]{0.61\textwidth}
-    \vspace{0.5cm}
-    {\fontsize{28}{34}\selectfont\bfseries TrackrAI\par}
-    \vspace{0.35cm}
-    {\fontsize{18}{23}\selectfont Plateforme distribuée de suivi et d'analyse de performance sportive\par}
-    \vspace{1.2cm}
 
-    {\large Simon BONNIN\par}
-    {\large Floryan BORNET\par}
-    {\large Corentin BRENDLÉ\par}
-    {\large Ludovic ERTZER\par}
-    {\large Gauthier WEIBEL\par}
-    \vspace{0.45cm}
-    {\normalsize BUT Informatique, 3\textsuperscript{e} année -- Groupe 4\par}
+  \noindent
+  \begin{minipage}[t]{0.44\textwidth}
+    \raggedright
+    \includegraphics[width=0.88\linewidth]{logo-universite.png}
   \end{minipage}
   \hfill
-  \begin{minipage}[t]{0.34\textwidth}
-    \centering
-    \vspace{0.2cm}
-    \includegraphics[width=\linewidth]{logo-trackrai.png}
+  \begin{minipage}[t]{0.44\textwidth}
+    \raggedleft
+    \includegraphics[width=0.95\linewidth]{logo-iut-info.png}
   \end{minipage}
 
-  \vfill
-  {\color{trackrred}\fontsize{26}{31}\selectfont\bfseries RAPPORT TECHNIQUE\par}
-  \vspace{0.7cm}
+  \begin{center}
+    \vspace{0.65cm}
+    {\color{trackrblue}\fontsize{27}{33}\selectfont\bfseries Rapport technique final\par}
+    \vspace{0.25cm}
+    {\color{trackrblue}\rule{0.78\textwidth}{1.2pt}\par}
+    \vspace{0.65cm}
+
+    {\color{trackrblue}\fontsize{19}{24}\selectfont\bfseries Tracker de performance sportive intelligent\par}
+    \vspace{0.35cm}
+    {\color{trackrblue}\Large TRACKR.AI\par}
+    \vspace{0.65cm}
+
+    \includegraphics[width=0.44\textwidth]{logo-trackrai.png}\par
+
+    \vfill
+
+    {\large Simon BONNIN -- Floryan BORNET -- Corentin BRENDLÉ -- Ludovic ERTZER\par}
+    \vspace{0.15cm}
+    {\large Gauthier WEIBEL\par}
+    \vspace{0.55cm}
+    {\large Groupe 4\par}
+    \vspace{0.35cm}
+    {\normalsize BUT Informatique -- 3\textsuperscript{e} année -- 2025--2026\par}
+  \end{center}
 \end{titlepage}
 \setcounter{page}{2}
 
@@ -236,8 +250,8 @@
 
 \phantomsection
 \addcontentsline{toc}{section}{Présentation de l'application}
-{\color{trackrred}\bfseries\fontsize{17}{20}\selectfont Présentation de l'application\par}
-\vspace{0.9em}
+\section*{Présentation de l'application}
+\label{sec:presentation}
 
 TrackrAI est une plateforme distribuée destinée au suivi de séances sportives. Elle collecte des mesures physiques, les centralise, calcule des statistiques de séance et restitue ces informations dans une interface web et mobile. Le système associe un boîtier d'acquisition, plusieurs services logiciels et une base de données commune.
 
@@ -576,9 +590,11 @@ Bouton intégré & BOOT, GPIO 0 & Effacement de la configuration après maintien
 \bottomrule
 \end{longtable}
 
-\subsubsection{Câblage et broches}
+L'ESP32-D0WDQ6 V3 constitue le point de collecte du boîtier. Son intégration du Wi-Fi et du Bluetooth Low Energy permet de communiquer respectivement avec le serveur central et la ceinture cardiaque sans ajouter de contrôleur réseau externe. Les interfaces UART et I2C assurent la communication avec le GPS et le module inertiel. Le profil PlatformIO \code{esp32dev} fournit l'environnement de compilation et de téléversement utilisé par le firmware.
 
-Le câblage du boîtier est présenté dans le \tabref{tab:cablage-esp32}. Le GPS et le module inertiel partagent l'alimentation 3,3~V et la masse de la carte. Les seules liaisons de données filaires sont la sortie TX du GPS vers l'entrée RX2 de l'ESP32, puis les lignes SDA et SCL du bus I2C pour le module inertiel. La ceinture cardiaque communique sans fil en Bluetooth Low Energy.
+\subsubsection{Câblage électrique et broches}
+
+Le schéma électrique du boîtier est présenté sous forme tabulaire dans le \tabref{tab:cablage-esp32}. Cette représentation indique, pour chaque module, l'alimentation, la masse, les broches de données et leur fonction. Le GPS et le module inertiel partagent l'alimentation 3,3~V et la masse de la carte. Les seules liaisons de données filaires sont la sortie TX du GPS vers l'entrée RX2 de l'ESP32, puis les lignes SDA et SCL du bus I2C pour le module inertiel. La ceinture cardiaque communique sans fil en Bluetooth Low Energy.
 
 \begin{longtable}{L{3.7cm}L{2.7cm}L{4.2cm}L{5.4cm}}
 \caption{Câblage du boîtier d'acquisition}\label{tab:cablage-esp32}\\
@@ -619,6 +635,8 @@ Le firmware est contenu dans un sketch unique, \code{arduino/src/sketch_esp/sket
 \end{itemize}
 
 Les fonctions centrales sont décrites dans le \tabref{tab:fonctions-esp}.
+
+\clearpage
 
 \begin{longtable}{L{4.6cm}L{11.4cm}}
 \caption{Fonctions centrales du firmware ESP32}\label{tab:fonctions-esp}\\
@@ -705,8 +723,6 @@ Le protocole est textuel, avec une commande par ligne. Les commandes principales
 \end{longtable}
 
 Chaque \code{ThreadServer} conserve un état \code{IDLE}, \code{RUNNING} ou \code{STOPPING}, ainsi que l'identifiant de la séance courante. Hors état \code{RUNNING}, une mesure est absorbée et reçoit la réponse \code{OK IGNORED}. Cette logique fait du protocole TCP la première barrière contre l'enregistrement de mesures hors séance.
-
-\clearpage
 
 Lorsqu'un même module se reconnecte, l'ancienne socket est fermée et remplacée dans la table des connexions. La méthode de nettoyage ne marque le module déconnecté que si le thread correspond encore à la connexion active, ce qui évite qu'un ancien thread invalide une nouvelle connexion.
 
@@ -848,6 +864,8 @@ L'index unique sur \code{Session.sessionId} empêche la duplication d'un identif
 
 Des exemples de documents sont fournis en \annref{ann:mongo}.
 
+\clearpage
+
 \subsection{Frontend Vue et application mobile}
 
 \subsubsection{Organisation des sources}
@@ -952,6 +970,8 @@ Le fichier externe généré contient 194 paires brutes. Après exclusion des ac
 
 La séparation conserve 83 observations brutes pour l'entraînement et 22 pour la validation. Une augmentation synthétique de facteur 2 est appliquée uniquement au sous-ensemble d'entraînement, avec un bruit gaussien correspondant à 2,5~\% de la dispersion de chaque caractéristique. Elle produit 249 exemples d'entraînement. Le paquet de modèle décrit donc 271 exemples utilisés au total, validation comprise.
 
+La durée exacte de l'entraînement n'est pas enregistrée dans le paquet \code{model.joblib}. Le script \code{train_model.py} produit les métriques, la date d'entraînement et le volume des jeux de données, mais devra être complété par une mesure du temps d'exécution lors d'un prochain réentraînement afin de documenter ce point de manière reproductible.
+
 \subsubsection{Métriques du modèle livré}
 
 \begin{table}[H]
@@ -987,8 +1007,6 @@ La réponse contient notamment \code{predictedNextHrAvg}, la fréquence cardiaqu
 À la fin d'une séance comparable ultérieure, l'évaluation est stockée dans \code{stats.aiPrediction.evaluation} avec les champs \code{actualHrAvg}, \code{absoluteErrorBpm}, \code{evaluatedWithSessionId} et \code{evaluatedAt}. Cette rétroaction locale permet de suivre les erreurs réelles et d'alimenter les entraînements suivants.
 
 La fonction \code{maybeRetrain()} déclenche un réentraînement asynchrone lorsque le nombre de séances éligibles atteint un multiple de dix. L'entraînement manuel reste accessible aux administrateurs par \code{POST /ai/train}. Les routes \code{GET /ai/predict/:sessionId} et \code{GET /ai/insights/:sessionId} exposent respectivement la prévision détaillée et son interprétation pour la séance suivante.
-
-\clearpage
 
 \subsection{Tests et intégration continue}
 
