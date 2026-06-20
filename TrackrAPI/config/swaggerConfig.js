@@ -204,13 +204,13 @@ const swaggerOptions = {
         get: { tags: ['Video analysis'], summary: 'Lire une analyse vidéo', parameters: [{ in: 'path', name: 'analysisId', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Analyse' }, 404: { description: 'Non visible ou absente' } } },
       },
       '/ai/train': {
-        post: { tags: ['AI'], summary: 'Réentraîner le modèle IA (admin)', responses: { 200: { description: 'Modèle entraîné' } } },
+        post: { tags: ['AI'], summary: 'Réentraîner XGBoost et appliquer les prévisions cardiaques (admin)', responses: { 200: { description: 'Modèle entraîné' } } },
       },
       '/ai/predict/{sessionId}': {
-        get: { tags: ['AI'], summary: 'Prédiction IA pour une séance', parameters: [{ in: 'path', name: 'sessionId', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Prédiction' } } },
+        get: { tags: ['AI'], summary: 'Prévoir la FC moyenne de la prochaine séance comparable', parameters: [{ in: 'path', name: 'sessionId', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Prédiction' } } },
       },
       '/ai/insights/{sessionId}': {
-        get: { tags: ['AI'], summary: 'Conseils IA/récupération', parameters: [{ in: 'path', name: 'sessionId', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Conseils' } } },
+        get: { tags: ['AI'], summary: 'Prévision cardiaque, validation et aide à la décision', parameters: [{ in: 'path', name: 'sessionId', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Conseils' } } },
       },
     },
   },

@@ -40,10 +40,10 @@
             </div>
             <div v-if="athleteInsight" class="grid grid-3" style="margin-top:1rem;">
                 <div class="card">
-                    <h4>Profil IA – Global</h4>
+                    <h4>Prévision cardiaque</h4>
                     <p class="muted">
-                        Score moyen :
-                        <strong>{{ athleteInsight.avgScore.toFixed(1) }}</strong>
+                        FC prévue moyenne :
+                        <strong>{{ athleteInsight.avgForecast.toFixed(1) }} bpm</strong>
                     </p>
                 </div>
 
@@ -76,7 +76,7 @@
             <div class="card" style="margin-top:1rem;">
                 <label>Métrique affichée</label>
                 <select v-model="metric">
-                    <option value="score">Score global</option>
+                    <option value="forecastHr">FC prévue prochaine séance</option>
                     <option value="distanceKm">Distance (km)</option>
                     <option value="hrAvg">Fréquence cardiaque moyenne</option>
                     <option value="stress">Stress</option>
@@ -95,16 +95,16 @@
                     <select v-model="sortBy">
                         <option value="date_desc">Date (récentes)</option>
                         <option value="date_asc">Date (anciennes)</option>
-                        <option value="score_desc">Score (élevé)</option>
-                        <option value="score_asc">Score (faible)</option>
+                        <option value="forecast_desc">FC prévue (élevée)</option>
+                        <option value="forecast_asc">FC prévue (faible)</option>
                         <option value="durationMin">Durée (min)</option>
                         <option value="steps">Pas</option>
                     </select>
                 </div>
 
                 <div>
-                    <label>Score minimum</label>
-                    <input type="number" min="0" max="100" v-model.number="minScore" />
+                    <label>FC prévue minimale</label>
+                    <input type="number" min="40" max="220" v-model.number="minForecast" />
                 </div>
             </div>
 
@@ -128,7 +128,7 @@
 
                         <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
 <span class="badge">
-  Score: {{ formatRounded(s.score) }}
+  FC prévue: {{ formatRounded(s.forecastHr) }} bpm
 </span>
 
 <span class="badge">
@@ -167,11 +167,11 @@ const days = ref(7)
 const loading = ref(false)
 const sessions = ref([])
 const sortBy = ref('date_desc')
-const minScore = ref(0)
-const metric = ref('score')
+const minForecast = ref(0)
+const metric = ref('forecastHr')
 
 const METRICS = {
-    score: { label: 'Score global', get: s => s.score, min: 0, max: 100 },
+    forecastHr: { label: 'FC prévue prochaine séance (bpm)', get: s => s.forecastHr, min: 60, max: 200 },
     distanceKm: { label: 'Distance (km)', get: s => s.distanceKm, min: 0 },
     hrAvg: { label: 'FC moyenne (bpm)', get: s => s.hrAvg, min: 60, max: 200 },
     stress: { label: 'Stress', get: s => s.stress, min: 0, max: 100 },
@@ -235,7 +235,9 @@ async function reload() {
       steps: getSessionSteps(session, allMeasures),
 
       stress: session.stats?.stress,
-      score: session.stats?.score?.global ?? null
+      forecastHr: session.stats?.aiPrediction?.target === 'next_comparable_session_hr_avg'
+        ? session.stats.aiPrediction.predictedHrAvg
+        : null
     }))
   } finally {
     loading.value = false
@@ -295,9 +297,9 @@ const stressAvgLabel = computed(() => {
 const filteredSessions = computed(() => {
     let list = [...sessions.value]
 
-    if (minScore.value > 0) {
+    if (minForecast.value > 0) {
         list = list.filter(
-            s => s.score != null && s.score >= minScore.value
+            s => s.forecastHr != null && s.forecastHr >= minForecast.value
         )
     }
 
@@ -308,11 +310,11 @@ const filteredSessions = computed(() => {
         case 'date_desc':
             list.sort((a, b) => new Date(b.start) - new Date(a.start))
             break
-        case 'score_desc':
-            list.sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        case 'forecast_desc':
+            list.sort((a, b) => (b.forecastHr ?? 0) - (a.forecastHr ?? 0))
             break
-        case 'score_asc':
-            list.sort((a, b) => (a.score ?? 0) - (b.score ?? 0))
+        case 'forecast_asc':
+            list.sort((a, b) => (a.forecastHr ?? 0) - (b.forecastHr ?? 0))
             break
         case 'durationMin':
             list.sort((a, b) => (b.durationMin ?? 0) - (a.durationMin ?? 0))
@@ -327,19 +329,19 @@ const filteredSessions = computed(() => {
 
 const athleteInsight = computed(() => {
   const list = sessions.value.filter(
-    s => s.stats?.score?.components
+    s => s.stats?.score?.components && Number.isFinite(s.forecastHr)
   )
 
   if (!list.length) return null
 
-  let avgScore = 0
+  let avgForecast = 0
   let load = 0
   let intensity = 0
   let recovery = 0
 
   for (const s of list) {
     const score = s.stats.score
-    avgScore += score.global
+    avgForecast += s.forecastHr
     load += score.components.load
     intensity += score.components.intensity
     recovery += score.components.recovery
@@ -348,7 +350,7 @@ const athleteInsight = computed(() => {
   const count = list.length
 
   return {
-    avgScore: avgScore / count,
+    avgForecast: avgForecast / count,
     load: load / count,
     intensity: intensity / count,
     recovery: recovery / count

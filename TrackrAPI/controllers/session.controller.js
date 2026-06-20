@@ -15,6 +15,48 @@ const { computeSessionStats } = require('../utils/sessionStats')
 const { maybeRetrain } = require("../ai/maybeRetrain");
 const aiService = require("../services/ai.service");
 
+function statsComparable(first, second) {
+  if (!first || !second) return false
+  const firstDuration = Number(first.durationMs) / 60000
+  const secondDuration = Number(second.durationMs) / 60000
+  if (firstDuration < 5 || secondDuration < 5) return false
+  const durationRatio = secondDuration / Math.max(firstDuration, 1)
+  if (durationRatio < 0.6 || durationRatio > 1.67) return false
+
+  if (Number(first.distanceKm) >= 0.1 && Number(second.distanceKm) >= 0.1) {
+    const ratio = Number(second.distanceKm) / Number(first.distanceKm)
+    return ratio >= 0.5 && ratio <= 2
+  }
+  if (Number(first.steps) >= 100 && Number(second.steps) >= 100) {
+    const ratio = Number(second.steps) / Number(first.steps)
+    return ratio >= 0.5 && ratio <= 2
+  }
+  return false
+}
+
+async function evaluatePreviousForecast(session) {
+  const candidates = await Session.find({
+    user: session.user,
+    startDate: { $lt: session.startDate },
+    "stats.aiPrediction.target": "next_comparable_session_hr_avg",
+    "stats.aiPrediction.evaluation": { $exists: false },
+  }).sort({ startDate: -1 }).limit(10).exec()
+
+  const previous = candidates.find(candidate => statsComparable(candidate.stats, session.stats))
+  if (!previous || !Number.isFinite(Number(session.stats?.hrAvg))) return
+
+  const predicted = Number(previous.stats.aiPrediction.predictedHrAvg)
+  const actual = Number(session.stats.hrAvg)
+  previous.stats.aiPrediction.evaluation = {
+    actualHrAvg: Math.round(actual * 10) / 10,
+    absoluteErrorBpm: Math.round(Math.abs(actual - predicted) * 10) / 10,
+    evaluatedWithSessionId: session.sessionId,
+    evaluatedAt: new Date(),
+  }
+  previous.markModified('stats')
+  await previous.save()
+}
+
 
 const start = async (req, res, next) => {
   answer.reset();
@@ -166,14 +208,20 @@ const stop = async (req, res, next) => {
   session.stats = stats
   session.endDate = new Date()
   await session.save()
-  
-  await maybeRetrain()
+
+  await evaluatePreviousForecast(session)
 
   try {
     const ai = aiService.predictSession(session.sessionId)
-    if (ai.ok && ai.global != null && session.stats?.score) {
-      session.stats.score.global = ai.global
-      session.stats.score.confidence = ai.confidence
+    if (ai.ok && Number.isFinite(ai.predictedNextHrAvg)) {
+      session.stats.aiPrediction = {
+        predictedHrAvg: ai.predictedNextHrAvg,
+        deltaBpm: ai.deltaBpm,
+        expectedRange: ai.expectedRange,
+        target: ai.target,
+        model: 'XGBoost',
+        predictedAt: new Date(),
+      }
       session.stats.aiExplain = ai.explain
       session.stats.aiModel = ai.model
       session.markModified('stats')
@@ -182,6 +230,8 @@ const stop = async (req, res, next) => {
   } catch (e) {
     console.error(`[AI] Prediction failed for session ${session.sessionId}:`, e.message)
   }
+
+  await maybeRetrain()
 
   answer.setPayload({ stopped: true, sessionMongoId: session._id, sessionId: session.sessionId })
   return res.status(200).send(answer)
@@ -273,4 +323,3 @@ const history = async (req, res, next) => {
 }
 
 module.exports = { start, stop, active, activeForModule, history };
-

@@ -6,7 +6,7 @@ const { AI_DIR, PYTHON_EXECUTABLE } = require("../services/ai.service");
 const MODEL_PATH = process.env.AI_MODEL_PATH || path.join(AI_DIR, "model.joblib");
 
 function initAI() {
-  const trainOnStart = process.env.AI_TRAIN_ON_START !== "0";
+  const trainOnStart = process.env.AI_TRAIN_ON_START === "1";
 
   if (fs.existsSync(MODEL_PATH) && !trainOnStart) {
     console.log("[AI] Existing model kept (AI_TRAIN_ON_START=0)");

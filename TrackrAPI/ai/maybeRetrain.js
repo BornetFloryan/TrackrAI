@@ -9,7 +9,8 @@ async function maybeRetrain() {
   if (retraining) return;
 
   const count = await Session.countDocuments({
-    "stats.score.global": { $exists: true }
+    "stats.hrAvg": { $exists: true },
+    "stats.durationMs": { $gte: 300000 }
   });
 
   if (count >= 10 && count % 10 === 0) {

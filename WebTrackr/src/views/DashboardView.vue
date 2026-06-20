@@ -44,15 +44,15 @@
       </div>
       <div v-if="globalInsight" class="grid grid-3" style="margin-top:1rem;">
         <div class="card">
-          <h4>Profil global – Score</h4>
+          <h4>Prévision cardiaque globale</h4>
           <p class="muted">
-            Score moyen :
-            <strong>{{ globalInsight.avgScore.toFixed(1) }}</strong>
+            FC prévue moyenne :
+            <strong>{{ globalInsight.avgScore.toFixed(1) }} bpm</strong>
           </p>
         </div>
 
         <div class="card">
-          <h4>Charge & Intensité</h4>
+          <h4>Indicateurs calculés</h4>
           <ul class="muted">
             <li>Charge : {{ globalInsight.load.toFixed(1) }}</li>
             <li>Intensité : {{ globalInsight.intensity.toFixed(1) }}</li>
@@ -78,7 +78,7 @@
       <div class="card" style="margin-top:1rem;">
         <label>Métrique affichée</label>
         <select v-model="metric">
-          <option value="score">Score global</option>
+          <option value="forecastHr">FC prévue prochaine séance</option>
           <option value="distanceKm">Distance (km)</option>
           <option value="hrAvg">FC moyenne</option>
           <option value="stress">Stress</option>
@@ -93,52 +93,17 @@
       </div>
 
       <div class="card" style="margin-top:1rem;">
-        <h3>Analyse IA – Score de séance</h3>
-
-        <p class="muted" style="margin-bottom:.75rem">
-          Le score affiché est un <strong>indice de qualité de séance</strong> compris entre 0 et 100.
-          Il est produit par un modèle d’intelligence artificielle entraîné à partir des séances précédentes.
-        </p>
-
-        <h4 style="margin:.5rem 0;">1. Score de référence (baseline métier)</h4>
+        <h3>Prévision cardiaque XGBoost</h3>
         <p class="muted">
-          Chaque séance est d’abord évaluée à l’aide d’un score calculé à partir de règles métier,
-          combinant plusieurs indicateurs physiologiques et mécaniques.
+          Le modèle prévoit en bpm la fréquence cardiaque moyenne de la prochaine séance de charge comparable.
+          La cible est une mesure réellement observée, pas un score construit. Lorsqu'une séance comparable
+          est réalisée, l'application enregistre la FC réelle et l'erreur de la prévision.
         </p>
-
-        <ul class="muted">
-          <li><strong>Charge d’entraînement (45 %)</strong> : distance parcourue rapportée à la durée</li>
-          <li><strong>Intensité (45 %)</strong> : fréquence cardiaque moyenne de la séance</li>
-          <li><strong>Récupération / stress (10 %)</strong> : indice dérivé du RMSSD ou de la FC</li>
-        </ul>
-
         <p class="muted">
-          Ces pondérations privilégient l’effort réellement produit tout en limitant l’impact du stress
-          afin d’éviter une surévaluation des séances fatigantes.
-        </p>
-
-        <h4 style="margin:.75rem 0 .25rem;">2. Apprentissage par intelligence artificielle</h4>
-        <p class="muted">
-          Un modèle <strong>XGBoost</strong> est ensuite entraîné sur l’historique des séances,
-          en utilisant le score de référence comme valeur cible.
-          Il apprend automatiquement les relations entre durée, distance, fréquence cardiaque,
-          stress et qualité globale de la séance.
-        </p>
-
-        <p class="muted">
-          Le score affiché dans le graphique correspond à la <strong>prédiction du modèle IA</strong>,
-          ce qui permet d’obtenir une évaluation cohérente, évolutive et adaptée au profil d’utilisation.
-        </p>
-
-        <p class="muted" style="margin-top:.5rem;">
-          <em>
-            Le score est relatif au jeu de données disponible et vise la comparaison inter-séances,
-            et non une évaluation médicale absolue.
-          </em>
+          Les séances de moins de 5 minutes ou sans distance, pas ou cardio exploitables ne reçoivent aucune
+          prévision. La validation compare XGBoost à une baseline simple qui reconduit la FC actuelle.
         </p>
       </div>
-
-
     </template>
   </div>
 </template>
@@ -164,14 +129,14 @@ const days = ref(7)
 const loading = ref(false)
 const sessions = ref([])
 const globalGpsPoints = ref([])
-const metric = ref('score')
+const metric = ref('forecastHr')
 
 const METRICS = {
-  score: {
-    label: 'Score global',
-    get: s => s.score,
-    min: 0,
-    max: 100
+  forecastHr: {
+    label: 'FC prévue prochaine séance (bpm)',
+    get: s => s.forecastHr,
+    min: 60,
+    max: 200
   },
   distanceKm: {
     label: 'Distance (km)',
@@ -218,7 +183,9 @@ async function reload() {
       steps: s.stats?.steps,
       stress: s.stats?.stress,
 
-      score: s.stats?.score?.global ?? null,
+      forecastHr: s.stats?.aiPrediction?.target === 'next_comparable_session_hr_avg'
+        ? s.stats.aiPrediction.predictedHrAvg
+        : null,
     }))
 
 
@@ -232,7 +199,7 @@ async function reload() {
 const chartData = computed(() => ({
   labels: sessions.value.map(s => new Date(s.start).toLocaleString()),
   datasets: [{
-    data: sessions.value.map(s => s.score ?? 0),
+    data: sessions.value.map(s => s.forecastHr ?? null),
     borderColor: '#6ee7ff',
     backgroundColor: 'rgba(110,231,255,.25)',
     tension: 0.3,
@@ -284,7 +251,7 @@ const chartOptions = {
 }
 const globalInsight = computed(() => {
   const list = sessions.value.filter(
-    s => s.stats?.score?.components
+    s => s.stats?.score?.components && Number.isFinite(s.forecastHr)
   )
 
   if (!list.length) return null
@@ -296,7 +263,7 @@ const globalInsight = computed(() => {
 
   for (const s of list) {
     const c = s.stats.score.components
-    avgScore += s.stats.score.global
+    avgScore += s.forecastHr
     load += c.load
     intensity += c.intensity
     recovery += c.recovery

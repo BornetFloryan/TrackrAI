@@ -239,11 +239,13 @@ const isCoach = computed(() => {
 
 const metrics = [
   {
-    key: 'score',
-    label: 'Score global',
-    unit: ' pts',
-    getter: session => session.stats?.score?.global,
-    higherIsBetter: true
+    key: 'forecastHr',
+    label: 'FC prévue (séance suivante)',
+    unit: ' bpm',
+    getter: session => session.stats?.aiPrediction?.target === 'next_comparable_session_hr_avg'
+      ? session.stats.aiPrediction.predictedHrAvg
+      : null,
+    higherIsBetter: null
   },
   {
     key: 'distance',
@@ -495,16 +497,18 @@ const coachNotes = computed(() => {
 
   const notes = []
 
-  const scoreDelta = deltaFor(metrics[0])
+  const forecastDelta = deltaFor(metrics[0])
   const distanceDelta = deltaFor(metrics[1])
   const hrDelta = deltaFor(metrics[3])
   const stressDelta = deltaFor(metrics[4])
 
-  if (scoreDelta != null) {
+  if (forecastDelta != null) {
     notes.push(
-      scoreDelta >= 0
-        ? 'Le score global progresse entre les deux séances.'
-        : 'Le score global baisse : vérifier fatigue, contexte ou qualité de mesure.'
+      Math.abs(forecastDelta) <= 3
+        ? 'La réponse cardiaque prévue reste stable à charge comparable.'
+        : forecastDelta > 0
+          ? 'La réponse cardiaque prévue augmente : surveiller fatigue et intensité.'
+          : 'La réponse cardiaque prévue diminue à charge comparable.'
     )
   }
 
@@ -603,7 +607,7 @@ function formatNumber(value, metric) {
     return value.toFixed(2)
   }
 
-  if (metric?.key === 'score') {
+  if (metric?.key === 'forecastHr') {
     return value.toFixed(1)
   }
 

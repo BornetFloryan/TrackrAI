@@ -51,7 +51,7 @@ const COLORS = [
 ]
 
 const metrics = {
-  score: { label: 'Score', get: s => s.score },
+  forecastHr: { label: 'FC prévue (bpm)', get: s => s.forecastHr },
   distanceKm: { label: 'Distance (km)', get: s => s.stats?.distanceKm },
   hrAvg: { label: 'FC moyenne', get: s => s.stats?.hrAvg },
   stress: { label: 'Stress', get: s => s.stats?.stress },

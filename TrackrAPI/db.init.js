@@ -368,24 +368,7 @@ async function createDemoSessionsForUser(userLogin, profile = {}) {
     };
 
     await session.save();
-
-    try {
-      const ai = aiService.predictSession(session.sessionId);
-      if (ai.ok && ai.global != null && session.stats?.score) {
-        session.stats.score.global = ai.global;
-        session.stats.score.confidence = ai.confidence;
-        session.stats.aiExplain = ai.explain;
-        session.stats.aiModel = ai.model;
-        session.markModified("stats");
-        await session.save();
-      } else {
-        console.error("Invalid AI output structure:", ai);
-      }
-    } catch (error) {
-      console.error(`AI prediction failed for demo session ${session.sessionId}:`, error.message);
-    }
-
-    console.log(`added DEMO session ${userLogin} ${d + 1}`);
+console.log(`added DEMO session ${userLogin} ${d + 1}`);
   }
 }
 
@@ -423,15 +406,54 @@ async function initDemoData() {
   }
 }
 
+async function trainAndApplyAiModel() {
+  try {
+    const train = aiService.trainModel();
+    if (!train.ok) {
+      console.error("AI training skipped:", train);
+      return;
+    }
+
+    const sessions = await Session.find({
+      endDate: { $exists: true },
+      "stats.score": { $exists: true },
+    }).exec();
+
+    for (const session of sessions) {
+      try {
+        const ai = aiService.predictSession(session.sessionId);
+        if (ai.ok && Number.isFinite(ai.predictedNextHrAvg)) {
+          session.stats.aiPrediction = {
+            predictedHrAvg: ai.predictedNextHrAvg,
+            deltaBpm: ai.deltaBpm,
+            expectedRange: ai.expectedRange,
+            target: ai.target,
+            model: 'XGBoost',
+            predictedAt: new Date(),
+          };
+          session.stats.aiExplain = ai.explain;
+          session.stats.aiModel = ai.model;
+          session.markModified("stats");
+          await session.save();
+        }
+      } catch (error) {
+        console.error(`AI prediction failed for session ${session.sessionId}:`, error.message);
+      }
+    }
+
+    console.log(`[AI] XGBoost trained and applied (${train.rawSamples} supervised pairs)`);
+  } catch (error) {
+    console.error("AI training failed:", error.message);
+  }
+}
+
 async function initBdD() {
   await initChipsets();
   await initModules();
   await initUsers();
   await initDemoData();
+  if (process.env.AI_TRAIN_AND_APPLY_ON_INIT === '1') {
+    await trainAndApplyAiModel();
+  }
 }
-
 module.exports = { initBdD };
-
-
-
-

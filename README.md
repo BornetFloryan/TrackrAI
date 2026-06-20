@@ -24,7 +24,7 @@ Le projet repose sur une architecture distribuée composée :
 - Prediction XGBoost et conseils de recuperation
 - Interfaces distinctes sportif, coach et administrateur
 - Retour immédiat :
-  - score global
+  - prévision de la fréquence cardiaque moyenne de la prochaine séance comparable
   - erreurs détectées
   - conseils d’amélioration
 - Stockage des résultats d’analyse en base de données
@@ -75,7 +75,7 @@ Frontend (upload vidéo)
 - **Développement** : Docker Compose (`docker-compose.dev.yml`)
 - **Production** : Docker Compose (`docker-compose.yml`)
 
-👉 Le code applicatif est identique en développement et en production.  
+👉 Le code applicatif est identique en développement et en production.
 👉 Seule la configuration Docker (réseau, proxy, build frontend) diffère.
 
 ---

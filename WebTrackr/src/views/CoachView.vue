@@ -38,7 +38,7 @@
     <div class="card" style="margin-top:1rem;">
       <label>Métrique comparée</label>
       <select v-model="metric">
-        <option value="score">Score global</option>
+        <option value="forecastHr">FC prévue prochaine séance</option>
         <option value="distanceKm">Distance</option>
         <option value="hrAvg">Fréquence cardiaque moyenne</option>
         <option value="stress">Stress</option>
@@ -80,7 +80,7 @@
             </div>
 
             <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
-              <span class="badge">Score: {{ fmt(s.score) }}</span>
+              <span class="badge">FC prévue: {{ fmt(s.forecastHr) }} bpm</span>
               <span class="badge">Dist: {{ s.stats?.distanceKm?.toFixed(2) || '0.00' }} km</span>
               <span class="badge">HR avg: {{ fmt(s.stats?.hrAvg) }}</span>
               <span class="badge">Stress: {{ s.stats?.stress ?? '—' }}</span>
@@ -126,7 +126,7 @@ const userId = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
 const loading = ref(false)
-const metric = ref('score')
+const metric = ref('forecastHr')
 let refreshPoller = null
 
 onMounted(async () => {
@@ -174,7 +174,9 @@ async function reload(options = {}) {
 
     sessions.value = list.map(s => ({
       ...s,
-      score: s.stats?.score?.global ?? null,
+      forecastHr: s.stats?.aiPrediction?.target === 'next_comparable_session_hr_avg'
+        ? s.stats.aiPrediction.predictedHrAvg
+        : null,
       durationMin: Math.round((s.stats?.durationMs ?? 0) / 60000),
       steps: s.stats?.steps ?? 0,
     }))
@@ -213,8 +215,3 @@ const stepsLabel = computed(() =>
   `${sessions.value.reduce((a, s) => a + (s.stats?.steps || 0), 0)}`
 )
 </script>
-
-
-
-
-

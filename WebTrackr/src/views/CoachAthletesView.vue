@@ -34,9 +34,9 @@
 
         <div v-if="athleteInsights[u._id]" class="insights">
           <p class="muted">
-            Score moyen :
+            FC prévue moyenne :
             <strong>
-              {{ athleteInsights[u._id].avgScore.toFixed(1) }}
+              {{ athleteInsights[u._id].avgForecast.toFixed(1) }} bpm
             </strong>
           </p>
 
@@ -156,13 +156,14 @@ const athleteInsights = computed(() => {
   for (const s of sessions.value) {
     const userId = s.user?._id
     const score = s.stats?.score
+    const forecast = s.stats?.aiPrediction
 
-    if (!userId || !score?.components) continue
+    if (!userId || !score?.components || forecast?.target !== 'next_comparable_session_hr_avg' || !Number.isFinite(forecast.predictedHrAvg)) continue
 
     if (!map[userId]) {
       map[userId] = {
         count: 0,
-        avgScore: 0,
+        avgForecast: 0,
         load: 0,
         intensity: 0,
         recovery: 0
@@ -170,7 +171,7 @@ const athleteInsights = computed(() => {
     }
 
     map[userId].count++
-    map[userId].avgScore += score.global
+    map[userId].avgForecast += forecast.predictedHrAvg
     map[userId].load += score.components.load
     map[userId].intensity += score.components.intensity
     map[userId].recovery += score.components.recovery
@@ -178,7 +179,7 @@ const athleteInsights = computed(() => {
 
   for (const id in map) {
     const v = map[id]
-    v.avgScore /= v.count
+    v.avgForecast /= v.count
     v.load /= v.count
     v.intensity /= v.count
     v.recovery /= v.count
@@ -249,6 +250,3 @@ function go(user) {
   min-width: 220px;
 }
 </style>
-
-
-

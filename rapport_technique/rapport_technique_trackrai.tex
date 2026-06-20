@@ -49,11 +49,11 @@
 
 TrackrAI est une application de suivi sportif destinée à centraliser des données issues de séances physiques, à les visualiser et à fournir des éléments d'analyse au sportif ainsi qu'à son encadrement. L'application associe un module matériel à base d'ESP32, une interface web/mobile, une API, une base de données, un serveur de centralisation et un serveur d'analyse vidéo.
 
-Le contexte principal d'utilisation est le suivi d'une séance d'entraînement réalisée par un sportif. Une séance peut être démarrée depuis l'interface applicative, puis alimentée par un module connecté qui transmet des mesures GPS, inertielles, cardiaques et un compteur de pas calculé localement sur l'ESP32 à partir de l'accéléromètre. Les données sont ensuite agrégées, filtrées et transformées en statistiques de séance. Le sportif consulte son historique, ses scores, compare deux séances et voit son coach référent. Le coach consulte les sportifs qui lui sont affectés, suit une séance active en direct depuis le détail de séance et compare leurs séances avec une lecture orientée progression. L'administrateur gère les utilisateurs, les modules et les affectations coach/sportif.
+Le contexte principal d'utilisation est le suivi d'une séance d'entraînement réalisée par un sportif. Une séance peut être démarrée depuis l'interface applicative, puis alimentée par un module connecté qui transmet des mesures GPS, inertielles, cardiaques et un compteur de pas calculé localement sur l'ESP32 à partir de l'accéléromètre. Les données sont ensuite agrégées, filtrées et transformées en statistiques de séance. Le sportif consulte son historique, ses statistiques et les prévisions cardiaques, compare deux séances et voit son coach référent. Le coach consulte les sportifs qui lui sont affectés, suit une séance active en direct depuis le détail de séance et compare leurs séances avec une lecture orientée progression. L'administrateur gère les utilisateurs, les modules et les affectations coach/sportif.
 
 L'application propose également une analyse vidéo de mouvements sportifs. Le flux vidéo est envoyé à un serveur Python par WebSocket, analysé avec MediaPipe/OpenCV, puis stocké dans un historique intégré à la page d'analyse vidéo. Le squat constitue le mode d'analyse principal. Des modes expérimentaux existent pour le développé couché et le soulevé de terre.
 
-Enfin, un module d'intelligence artificielle produit un score prédictif de séance à partir de statistiques calculées sur l'historique. L'objectif fonctionnel est de tendre vers un suivi qui s'adapte progressivement au sportif au fur et à mesure des séances enregistrées. Dans l'état actuel, cette adaptation est réalisée par un modèle XGBoost ré-entraînable sur les séances disponibles, avec une augmentation synthétique contrôlée afin de stabiliser la démonstration lorsque le volume de données réel reste limité.
+Enfin, un modèle XGBoost prévoit la fréquence cardiaque moyenne de la prochaine séance comparable. La cible est une mesure réellement observée, en bpm, et non un score fabriqué. L'entraînement combine les séances locales de MongoDB et des fenêtres cardiaques et inertielles extraites de l'archive officielle PAMAP2 de l'UCI. Lorsqu'une séance comparable suivante est réalisée, l'application mesure l'erreur entre prévision et observation afin de constituer progressivement un retour propre au sportif.
 
 \section{Structure logicielle et matérielle globale}
 
@@ -524,50 +524,58 @@ Les modes expérimentaux dépendent fortement de l'angle de caméra, de la stabi
 
 \subsubsection{Objectif}
 
-Le module IA prédit un score global de séance à partir de statistiques calculées. Il ne remplace pas le score déterministe, mais fournit une estimation entraînée sur l'historique disponible. L'objectif produit est que l'évaluation devienne progressivement plus représentative du sportif suivi lorsque de nouvelles séances sont ajoutées à la base. Le système actuel met en place cette base technique avec un modèle ré-entraînable et des conseils simples de récupération ; il ne constitue pas encore un générateur autonome de programmes d'entraînement personnalisés.
+Le module IA ne produit plus un score abstrait sur 100. Il prévoit une grandeur directement observable : la fréquence cardiaque moyenne, en battements par minute, de la prochaine séance de charge comparable. Cette prévision peut être confrontée à la fréquence cardiaque réellement mesurée lorsque cette séance est réalisée. L'application conserve alors la valeur prévue, la valeur observée et l'erreur absolue en bpm. Le modèle devient ainsi évaluable et peut progressivement intégrer de nouvelles paires issues du sportif.
 
-\subsubsection{Modèle utilisé}
+La prévision alimente une aide à la décision prudente. Une hausse légère de charge n'est proposée que si les indicateurs de récupération sont favorables et si le modèle bat une baseline simple sur le jeu de validation. Dans le cas contraire, l'interface indique explicitement que la prévision reste informative. Il ne s'agit ni d'un avis médical ni d'un générateur autonome de programmes.
 
-Le modèle utilisé est \texttt{XGBRegressor}. Ce choix est adapté à un jeu de données tabulaire de taille réduite, avec peu de caractéristiques numériques et un besoin de prédiction rapide. XGBoost gère correctement les relations non linéaires sans nécessiter un volume massif de données comme un réseau de neurones profond.
+\subsubsection{Modèle et cible}
 
-Les caractéristiques utilisées sont :
+Le modèle utilisé est \texttt{XGBRegressor}. Ce choix convient aux données tabulaires numériques et permet une inférence rapide. Les caractéristiques sont :
 
 \begin{itemize}
-  \item \texttt{distanceKm} ;
-  \item \texttt{hrAvg} ;
+  \item \texttt{distanceKm} et \texttt{durationMin} ;
+  \item \texttt{hrAvg} et \texttt{hrMax} ;
   \item \texttt{stress} ;
-  \item \texttt{durationMs} ;
-  \item \texttt{steps}.
+  \item \texttt{steps} et \texttt{paceStepsPerMin} ;
+  \item les écarts de distance, pas, stress et fréquence cardiaque par rapport à l'historique ;
+  \item le nombre de séances antérieures et le délai depuis la séance précédente.
 \end{itemize}
 
-La cible d'entraînement est le score global déjà calculé dans les statistiques de séance.
+La cible \texttt{next\_comparable\_session\_hr\_avg} est la fréquence cardiaque moyenne effectivement observée lors de la prochaine séance comparable. Pour les données TrackrAI, deux séances sont comparables si elles durent au moins cinq minutes, contiennent un cardio valide, disposent d'une charge mesurable par distance ou pas, et présentent des rapports de durée et de charge raisonnables. Aucune pondération métier ne fabrique la cible.
 
-\subsubsection{Entraînement}
+\subsubsection{Données externes et entraînement}
 
-Le script \texttt{TrackrAPI/ai/train\_model.py} charge les séances possédant un score global. Si moins de dix lignes exploitables sont disponibles, l'entraînement est refusé. Une augmentation synthétique contrôlée est appliquée par bruit faible autour des séances réelles. Cette augmentation stabilise le modèle pour la démonstration, mais elle ne remplace pas un vrai jeu de données multi-athlètes annoté. Le ré-entraînement permet d'intégrer les nouvelles séances et donc de faire évoluer le modèle avec l'historique collecté, ce qui correspond au premier niveau d'adaptation progressive au sportif.
+Le script \texttt{prepare\_pamap2.py} télécharge l'archive officielle PAMAP2 de l'UCI, y compris son archive ZIP imbriquée, puis lit les fichiers Protocol des neuf sujets. Les signaux cardiaques et inertiels sont agrégés en fenêtres consécutives de 60 secondes appartenant à la même activité. Pour chaque paire, \texttt{nextHrAvg} contient la fréquence cardiaque réellement mesurée dans la fenêtre suivante.
 
-Un exemple d'entraînement validé dans l'environnement Docker produit :
+Le fichier généré contient 194 paires brutes. Après exclusion des activités sans charge locomotrice exploitable, le dernier entraînement utilise 81 paires PAMAP2 et 24 paires TrackrAI, soit 105 observations réelles. La séparation entraînement/validation est effectuée par sujet avant l'augmentation synthétique. Le bruit faible n'est appliqué qu'au sous-ensemble d'entraînement : aucune copie d'une observation de validation ne peut donc se retrouver dans l'entraînement.
 
 \begin{lstlisting}[style=trackrcode]
-rawSamples: 21
-augmentedSamples: 126
-samples: 147
-augmentationFactor: 6
-syntheticAugmentation: true
+target: next_comparable_session_hr_avg
+rawSamples: 105
+localSamples: 24
+externalSamples: 81
+validationSamples: 22
+maeBpm: 6.172
+rmseBpm: 7.907
+r2: 0.793
+baselineMaeBpm: 5.434
+beatsBaseline: false
 \end{lstlisting}
 
-Les métriques sauvegardées sont la MAE, la RMSE et le $R^2$ sur une séparation entraînement/validation. Ces métriques doivent être interprétées avec prudence en raison du faible volume de données réelles.
+La baseline prévoit simplement que la prochaine fréquence cardiaque moyenne sera identique à l'actuelle. Sur la séparation actuelle, sa MAE de 5,434 bpm reste meilleure que celle de XGBoost, égale à 6,172 bpm. Ce résultat est conservé et affiché honnêtement : le modèle n'est pas encore autorisé à piloter automatiquement une augmentation de charge. Le pipeline est néanmoins fonctionnel, reproductible et mesurable ; de nouvelles séances réelles permettront de vérifier si la personnalisation locale améliore progressivement ce résultat.
 
-\subsubsection{Prédiction}
+\subsubsection{Prédiction et vérification}
 
-Le script \texttt{predict\_session.py} reçoit un identifiant de séance, charge le modèle \texttt{model.joblib}, extrait les caractéristiques de la séance et renvoie :
+Le script \texttt{predict\_session.py} refuse les séances de moins de cinq minutes, sans fréquence cardiaque ou sans distance ni pas exploitables. Pour une séance éligible, il renvoie :
 
 \begin{itemize}
-  \item le score prédit ;
-  \item une confiance indicative ;
-  \item les caractéristiques utilisées ;
-  \item les métadonnées d'entraînement du modèle.
+  \item la fréquence cardiaque moyenne prévue en bpm ;
+  \item l'écart prévu par rapport à la séance actuelle ;
+  \item une plage indicative construite à partir de la MAE de validation ;
+  \item les caractéristiques utilisées et les métriques du modèle.
 \end{itemize}
+
+Lorsqu'une séance comparable suivante se termine, l'API rattache sa fréquence cardiaque observée à la prévision précédente et calcule l'erreur absolue. L'endpoint \texttt{/ai/insights/:sessionId} expose ces informations au sportif, à son coach affecté et à l'administrateur. Les objectifs de durée, distance ou pas restent issus de règles prudentes et transparentes ; ils ne sont augmentés que si la validation du modèle et les indicateurs physiologiques le permettent.
 
 \section{Sécurité applicative}
 
@@ -662,7 +670,7 @@ Le squat est le mode le plus fiable. Les modes développé couché et soulevé d
 
 \subsection{Intelligence artificielle}
 
-Le dataset réel reste réduit. L'augmentation synthétique améliore la stabilité de la démonstration, mais un modèle sportif généraliste demanderait davantage de séances réelles, davantage d'athlètes et des annotations fiables. Le système actuel exploite l'historique pour prédire et expliquer une séance ; la personnalisation complète de l'entraînement reste une perspective. Une extension possible est l'intégration d'un assistant LLM de génération de programmes personnalisés utilisant l'historique des séances, la fatigue, la récupération, les objectifs et les résultats vidéo.
+Le modèle cardiaque est entraîné sur 105 paires observées, dont 81 issues de PAMAP2 et 24 de TrackrAI. Malgré un coefficient $R^2$ de 0,793, sa MAE de 6,172 bpm ne bat pas encore la baseline à 5,434 bpm. L'application expose cette limite et interdit au modèle de justifier seul une hausse de charge. L'objectif prioritaire est de collecter davantage de séances comparables par sportif, de suivre l'erreur prévue/réelle et de réévaluer le modèle avec une validation par individu. Un assistant LLM de génération de programmes reste une perspective distincte et ne doit pas être confondu avec ce modèle prédictif.
 
 \subsection{Sécurité et production}
 
@@ -705,9 +713,10 @@ Bouton BOOT & GPIO 0 & Réinitialisation longue de la configuration. \\
   \item Documentation Express : \url{https://expressjs.com/}
   \item Documentation MongoDB : \url{https://www.mongodb.com/docs/}
   \item Documentation MediaPipe : \url{https://developers.google.com/mediapipe}
+  \item Dataset PAMAP2 UCI : \url{https://archive.ics.uci.edu/dataset/231/pamap2+physical+activity+monitoring}
+  \item DOI PAMAP2 : \url{https://doi.org/10.24432/C5NW2H}
   \item Documentation XGBoost : \url{https://xgboost.readthedocs.io/}
   \item Documentation PlatformIO : \url{https://docs.platformio.org/}
 \end{itemize}
 
 \end{document}
-

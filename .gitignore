@@ -161,3 +161,6 @@ pip-delete-this-directory.txt
 
 # Windows junk
 *:Zone.Identifier
+
+# Downloaded IA datasets
+TrackrAPI/ai/*.zip

@@ -128,7 +128,7 @@ docker compose -f docker-compose.dev.yml exec trackr-api node --check TrackrAPI.
 
 1. Se connecter en administrateur et affecter un coach a un sportif.
 2. Se connecter en sportif, lancer une seance avec l'ESP32, observer les mesures en direct puis arreter la seance.
-3. Ouvrir le detail de la seance : statistiques, score, stress, graphiques et GPS si disponible.
+3. Ouvrir le detail de la seance : statistiques, prévision cardiaque XGBoost, stress, graphiques et GPS si disponible.
 4. Se connecter en coach, ouvrir la page des sportifs suivis et acceder a la seance en direct si elle est active.
 5. Comparer deux seances terminees depuis l'onglet Comparer.
 6. Lancer une analyse video depuis la page Analyse video et verifier son apparition dans l'historique.

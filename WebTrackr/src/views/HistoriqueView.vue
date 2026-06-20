@@ -51,7 +51,7 @@
             <div style="font-weight:900; font-size:1.05rem;">
               {{ formatDate(s.startDate) }}
               -
-              Score {{ formatScore(s.stats?.score?.global) }}
+              FC prévue : {{ formatForecast(s.stats?.aiPrediction) }}
             </div>
             <div class="muted" style="font-size:.9rem;">
               Durée: {{ formatDuration(s.stats?.durationMs) }}
@@ -147,9 +147,10 @@ function formatDuration(ms = 0) {
   const s = Math.floor(ms / 1000)
   return `${Math.floor(s / 60)}m ${s % 60}s`
 }
-function formatScore(value) {
-  const number = Number(value)
-  return Number.isFinite(number) ? number.toFixed(2) : '—'
+function formatForecast(prediction) {
+  if (prediction?.target !== 'next_comparable_session_hr_avg') return '—'
+  const value = Number(prediction.predictedHrAvg)
+  return Number.isFinite(value) ? value.toFixed(1) + ' bpm' : '—'
 }
 function fmt(v) {
   return v == null ? '—' : Math.round(v)
