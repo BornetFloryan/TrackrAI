@@ -6,9 +6,10 @@ WORKDIR /app
 COPY . .
 
 # Compiler avec classpath explicite (tous les JAR)
-RUN javac -cp "lib/*" server/src/*.java client/src/*.java
+RUN javac -cp "lib/*" server/src/*.java
 
 EXPOSE 9000
 
 # Lancer avec le même classpath
-CMD ["java", "-cp", "lib/*:server/src:client/src", "TrackrCentralServer", "9000"]
+CMD ["java", "-cp", "lib/*:server/src", "TrackrCentralServer", "9000"]
+
